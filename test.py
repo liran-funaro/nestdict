@@ -4,6 +4,7 @@ import unittest
 import shutil
 import tempfile
 import itertools
+import numpy as np
 
 from nested_dict_fs import NestedDictFS, AccessViolation, AccessViolationType
 
@@ -140,6 +141,13 @@ class TestNestedDictFSViolations(unittest.TestCase):
         with self.assertRaises(ValueError):
             k['a'] = 1
 
+    def test_invalid_engine(self):
+        with self.assertRaises(ValueError):
+            _ = NestedDictFS(self.path, mode='c', store_engine='invalid')
+
+        with self.assertRaises(TypeError):
+            _ = NestedDictFS(self.path, mode='c', store_engine={})
+
 
 class TestNestedDictFS(unittest.TestCase):
     def setUp(self):
@@ -252,6 +260,17 @@ class TestNestedDictFS(unittest.TestCase):
         k.append('a', 3)
         self.assertListEqual(k['a'], [1, 2, 3])
 
+        k = NestedDictFS(self.path, mode='c', store_engine='msgpack')
+
+        k['a'] = 1
+        self.assertEqual(k['a'], 1)
+
+        k.append('a', 2)
+        self.assertListEqual(k['a'], [1, 2])
+
+        k.append('a', 3)
+        self.assertListEqual(k['a'], [1, 2, 3])
+
     def test_exists(self):
         k = NestedDictFS(self.path, mode='c')
         k['a'] = 1
@@ -286,6 +305,43 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertGreaterEqual(len(k.cache), 1)
         k.clear_cache()
         self.assertEqual(len(k.cache), 0)
+
+    def test_msgpack(self):
+        k = NestedDictFS(self.path, mode='c', store_engine='msgpack')
+        k['a'] = 1
+        self.assertEqual(k['a'], 1)
+
+        with self.assertRaises(TypeError):
+            k['a'] = np.array([1, 2, 3])
+
+    def test_msgpack_numpy(self):
+        k = NestedDictFS(self.path, mode='c', store_engine='msgpack-numpy')
+        a = np.array([1, 2, 3])
+        k['a'] = a
+        self.assertTrue(np.all(k['a'] == a))
+
+    def test_pickle(self):
+        k = NestedDictFS(self.path, mode='c', store_engine='pickle')
+        k['a'] = 1
+        self.assertEqual(k['a'], 1)
+
+    def test_binary(self):
+        k = NestedDictFS(self.path, mode='c', store_engine='binary')
+        k['a'] = b"test"
+        self.assertEqual(k['a'], b"test")
+
+    def test_manual_storage_engine(self):
+        import pickle
+
+        def my_write(f, obj):
+            pickle.dump(obj, f)
+
+        def my_read(f):
+            return pickle.load(f)
+
+        k = NestedDictFS(self.path, mode='c', store_engine=(my_write, my_read))
+        k['a'] = 1
+        self.assertEqual(k['a'], 1)
 
 
 def get_key_value(*keys):

@@ -17,24 +17,12 @@ You should have received a copy of the GNU General Public License along
 with this program; if not, write to the Free Software Foundation, Inc., 51
 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
-import sys
-import pkgutil
-import importlib
+import pickle
 
 
-DEFAULT_STORE_ENGINE = 'msgpack-numpy'
-ENGINES = list([modname for _, modname, _ in pkgutil.iter_modules(sys.modules[__name__].__path__)])
+def write(f, obj):
+    pickle.dump(obj, f)
 
 
-def get_store_engine(method):
-    if type(method) in (list, tuple) and len(method) == 2:
-        return method
-    elif not isinstance(method, str):
-        raise TypeError(f"Store engine must be a string or a tuple of (write, read) methods. Not {type(method)}.")
-
-    if method not in ENGINES:
-        raise ValueError(f"No such storage engine: {method}")
-
-    eng = importlib.import_module(f'.{method}', __name__)
-    return eng.write, eng.read
-
+def read(f):
+    return pickle.load(f)

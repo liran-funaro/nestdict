@@ -17,6 +17,6 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     long_description=open('README').read(),
-    install_requires=['lru-dict', 'msgpack', 'msgpack-numpy']
+    install_requires=['lru-dict', 'numpy', 'msgpack', 'msgpack-numpy']
 )
 
