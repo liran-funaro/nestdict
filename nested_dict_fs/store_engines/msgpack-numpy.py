@@ -18,6 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc., 51
 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
 import msgpack
+from msgpack.exceptions import ExtraData
 import msgpack_numpy as m
 
 
@@ -28,6 +29,6 @@ def write(f, obj):
 def read(f):
     try:
         return msgpack.unpack(f, raw=False, object_hook=m.decode)
-    except msgpack.exceptions.ExtraData:
+    except ExtraData:
         f.seek(0)
         return list(msgpack.Unpacker(f, raw=False, object_hook=m.decode))

@@ -22,7 +22,6 @@ Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
 import os
 import gc
-import time
 import gzip
 import shutil
 from lru import LRU
