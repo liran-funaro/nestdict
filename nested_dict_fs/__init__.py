@@ -146,6 +146,8 @@ class NestedDictFS:
         return self.__class__(item_path, mode=mode, shared_cache=self.cache, store_engine=self.store_engine)
 
     def _internal_verify_sub_item(self, item):
+        if type(item) not in (list, tuple):
+            return
         for i in range(1, len(item)):
             sub_item = item[:i]
             sub_item_path = self.key_path(sub_item)
