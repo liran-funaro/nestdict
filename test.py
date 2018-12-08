@@ -138,8 +138,20 @@ class TestNestedDictFSViolations(unittest.TestCase):
     def test_store_value_over_child(self):
         k = NestedDictFS(self.path, mode='c')
         k['a', 'b'] = 1
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AccessViolation) as av:
             k['a'] = 1
+        self.assertEqual(av.exception.violation, AccessViolationType.SET_CHILD)
+
+    def test_store_child_over_value(self):
+        k = NestedDictFS(self.path, mode='c')
+        k['a'] = 1
+        with self.assertRaises(AccessViolation) as av:
+            k['a', 'b'] = 1
+        self.assertEqual(av.exception.violation, AccessViolationType.VALUE_SUB_ITEM)
+
+        with self.assertRaises(AccessViolation) as av:
+            k.get_child(('a', 'b'))
+        self.assertEqual(av.exception.violation, AccessViolationType.VALUE_SUB_ITEM)
 
     def test_invalid_engine(self):
         with self.assertRaises(ValueError):

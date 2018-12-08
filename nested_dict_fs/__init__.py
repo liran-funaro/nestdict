@@ -34,12 +34,15 @@ class AccessViolationType(Enum):
     NOT_INCLUDE_CHILD = 2
     NOT_INCLUDE_VALUE = 3
     NO_SUCH_KEY = 4
+    VALUE_SUB_ITEM = 5
+    SET_CHILD = 6
 
 
 class AccessViolation(Exception):
-    def __init__(self, obj, item, violation: AccessViolationType):
+    def __init__(self, obj, item, violation: AccessViolationType, sub_item=None):
         self.obj = obj
         self.item = item
+        self.sub_item = sub_item
         self.violation = violation
         self.msg = f"Access violation in {obj} with item {item}"
         if violation == AccessViolationType.READ_ONLY:
@@ -50,6 +53,10 @@ class AccessViolation(Exception):
             self.msg = f"Item {item} is a value but values were not included in the search."
         elif violation == AccessViolationType.NO_SUCH_KEY:
             self.msg = f"Item {item} does not exist in {obj}."
+        elif violation == AccessViolationType.VALUE_SUB_ITEM:
+            self.msg = f"Sub item {sub_item} is a value but requested {item}."
+        elif violation == AccessViolationType.SET_CHILD:
+            self.msg = f"Cannot set a value to a child. Must remove first subtree {item}."
 
         super().__init__(self.msg)
 
@@ -142,6 +149,15 @@ class NestedDictFS:
         mode = self.mode if not create else 'c'
         return self.__class__(item_path, mode=mode, shared_cache=self.cache, store_engine=self.store_engine)
 
+    def _internal_verify_sub_item(self, item):
+        for i in range(1, len(item)):
+            sub_item = item[:i]
+            sub_item_path = self.key_path(sub_item)
+            if os.path.isdir(sub_item_path):
+                continue
+            elif os.path.isfile(sub_item_path):
+                raise AccessViolation(self, item, AccessViolationType.VALUE_SUB_ITEM, sub_item)
+
     def _internal_get_direct(self, item, item_path, default_value=None, raise_err=True,
                              include_child=True, include_value=True, create_child=False):
         include_child |= create_child
@@ -167,6 +183,7 @@ class NestedDictFS:
 
     def _internal_get_cached(self, item, default_value=None, raise_err=True,
                              include_child=True, include_value=True, create_child=False):
+        self._internal_verify_sub_item(item)
         item_path = self.key_path(item)
 
         ret_stat, ret_value = self.cache.get(item_path, (None, default_value))
@@ -269,9 +286,11 @@ class NestedDictFS:
         if isinstance(value, self.__class__):
             raise ValueError(f"Cannot store a {self.__class__.__name__} object.")
 
+        self._internal_verify_sub_item(item)
+
         item_path = self.key_path(item)
         if os.path.isdir(item_path):
-            raise ValueError(f"Cannot set a value to a child. Must remove first subtree {item}.")
+            raise AccessViolation(self, item, AccessViolationType.SET_CHILD)
 
         dir_path = os.path.dirname(item_path)
         os.makedirs(dir_path, exist_ok=True)
