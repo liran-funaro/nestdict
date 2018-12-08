@@ -1,5 +1,6 @@
 # Permanent Nested Dict via File System's Folders
-This package allow storing permanent data on the drive via a hierarchical/nested dict-like API.
+This package allows storing permanent data on the drive via a hierarchical/nested dict-like API.
+The data will be stored as nested directories structure over the file system.
 
 # Usage
 ```python
