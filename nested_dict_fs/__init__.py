@@ -94,7 +94,7 @@ class NestedDictFS:
                  store_engine=store_engines.DEFAULT_STORE_ENGINE, compress_level=9):
         """
         :param data_path: The key value store data path. It is possible to start from sub folder of existing path.
-            Might be a string represents the path or an existing KeyValueFolderStore object.
+            Might be a string represents the path or an existing NestedDictFS object.
         :param mode: Should be 'r' for read only, 'w', 'rw' or 'wr' for writable,
             and 'c' for allow creation of a new data path (lazy).
         :param cache_size: Define the cache size to use. Defaults to 128.
