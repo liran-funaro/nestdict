@@ -1,4 +1,7 @@
-# Permanent Nested Dict via File System's Folders
+# nested_dict_fs
+
+Permanent Nested Dict via File System's Folders
+
 This package allows storing permanent data on the drive via a hierarchical/nested dict-like API.
 The data will be stored as nested directories structure over the file system.
 
@@ -16,8 +19,10 @@ print(list(k.keys()))
  
 print(list(k['a'].items()))
 # [('1', 1), ('2', 2), ('3', 3)]
-
 ```
 
 # Install (beta)
 `python setup.py develop --user`
+
+# License
+[GPL](LICENSE)
