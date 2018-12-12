@@ -40,16 +40,27 @@ def clean(path):
 
 def get_ret_list(ret_obj):
     ret = []
-    for k, v in ret_obj:
-        if isinstance(v, NestedDictFS):
-            v = v.data_path
-        ret.append((k, v))
+    for kv in ret_obj:
+        if isinstance(kv, tuple):
+            k, v = kv
+            if isinstance(v, NestedDictFS):
+                v = v.data_path
+            ret.append((k, v))
+        elif isinstance(kv, str):
+            ret.append(kv)
+        else:
+            ret.append(kv.data_path)
     return ret
 
 
-def get_key_path(obj, *keys, force_tuple=True):
+def get_keys(*keys, force_tuple=True):
     if force_tuple:
         keys = [k if isinstance(k, tuple) else (k,) for k in keys]
+    return keys
+
+
+def get_key_path(obj, *keys, force_tuple=True):
+    keys = get_keys(*keys, force_tuple=force_tuple)
     return [(k, obj.key_path(k)) for k in keys]
 
 
@@ -100,16 +111,16 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['a'] = 1
 
         with self.assertRaises(NDFSLookupError) as av:
-            k.get('a', include_value=False)
+            k.get('a', include_data=False)
 
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.NOT_INCLUDE_DATA)
 
         _ = k.get('a')
 
         with self.assertRaises(NDFSLookupError) as av:
-            k.get('a', include_value=False)
+            k.get('a', include_data=False)
 
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.NOT_INCLUDE_DATA)
 
     def test_not_include_child(self):
         k = NestedDictFS(self.path, mode='c')
@@ -118,35 +129,53 @@ class TestNestedDictFSViolations(unittest.TestCase):
         with self.assertRaises(NDFSLookupError) as av:
             k.get('a', include_child=False)
 
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.NOT_INCLUDE_CHILD)
 
         _ = k.get('a')
 
         with self.assertRaises(NDFSLookupError) as av:
             k.get('a', include_child=False)
 
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.NOT_INCLUDE_CHILD)
 
     def test_no_suck_key(self):
         k = NestedDictFS(self.path, mode='c')
 
         with self.assertRaises(NDFSKeyError) as av:
             _ = k['a']
-        self.assertEqual(av.exception.error, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.NO_SUCH_KEY)
 
         with self.assertRaises(NDFSKeyError) as av:
             del k['a']
-        self.assertEqual(av.exception.error, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.NO_SUCH_KEY)
 
     def test_bad_path(self):
         with self.assertRaises(TypeError):
             _ = NestedDictFS(None, mode='c')
 
-    def test_middle_ellipsis(self):
+    def test_ellipsis(self):
         k = NestedDictFS(self.path, mode='c')
         with self.assertRaises(NDFSKeyError) as av:
             _ = k['a', ..., 'b']
-        self.assertEqual(av.exception.error, NDFSKeyError.KeyErrorType.ELLIPSIS)
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.ELLIPSIS)
+        with self.assertRaises(NDFSKeyError) as av:
+            _ = k['a', ...]
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.ELLIPSIS)
+        with self.assertRaises(NDFSKeyError) as av:
+            _ = k[...]
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.ELLIPSIS)
+
+    def test_slice(self):
+        k = NestedDictFS(self.path, mode='c')
+        with self.assertRaises(NDFSKeyError) as av:
+            _ = k['a', :, 'b']
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.SLICE)
+        with self.assertRaises(NDFSKeyError) as av:
+            _ = k['a', :]
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.SLICE)
+        with self.assertRaises(NDFSKeyError) as av:
+            _ = k[:]
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.SLICE)
 
     def test_store_child(self):
         k = NestedDictFS(self.path, mode='c')
@@ -159,18 +188,18 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['a', 'b'] = 1
         with self.assertRaises(NDFSLookupError) as av:
             k['a'] = 1
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_VALUE_OVER_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_DATA_OVER_CHILD)
 
     def test_store_child_over_value(self):
         k = NestedDictFS(self.path, mode='c')
         k['a'] = 1
         with self.assertRaises(NDFSLookupError) as av:
             k['a', 'b'] = 1
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.VALUE_SUB_ITEM)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.DATA_SUB_ITEM)
 
         with self.assertRaises(NDFSLookupError) as av:
             k.get_child(('a', 'b'))
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.VALUE_SUB_ITEM)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.DATA_SUB_ITEM)
 
     def test_invalid_engine(self):
         with self.assertRaises(ValueError):
@@ -185,7 +214,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['b', 'y'] = 2
         with self.assertRaises(NDFSLookupError) as av:
             k.move(('a', 'x'), 'b')
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_VALUE_OVER_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_DATA_OVER_CHILD)
 
     def test_copy_value_over_child(self):
         k = NestedDictFS(self.path, mode='c')
@@ -193,7 +222,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['b', 'y'] = 2
         with self.assertRaises(NDFSLookupError) as av:
             k.copy(('a', 'x'), 'b')
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_VALUE_OVER_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_DATA_OVER_CHILD)
 
     def test_move_child_over_value(self):
         k = NestedDictFS(self.path, mode='c')
@@ -203,7 +232,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['b'] = 5
         with self.assertRaises(NDFSLookupError) as av:
             k.move('a', 'b')
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_CHILD_OVER_VALUE)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_CHILD_OVER_DATA)
 
     def test_copy_child_over_value(self):
         k = NestedDictFS(self.path, mode='c')
@@ -213,7 +242,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['b'] = 5
         with self.assertRaises(NDFSLookupError) as av:
             k.copy('a', 'b')
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_CHILD_OVER_VALUE)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_CHILD_OVER_DATA)
 
     def test_move_child_over_child(self):
         k = NestedDictFS(self.path, mode='c')
@@ -223,7 +252,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['b', 'y'] = 5
         with self.assertRaises(NDFSLookupError) as av:
             k.move('a', 'b')
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_CHILD_OVER_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_CHILD_OVER_CHILD)
 
         k['b'].delete('y')
         self.assertTrue(k['b'].empty())
@@ -238,7 +267,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k['b', 'y'] = 5
         with self.assertRaises(NDFSLookupError) as av:
             k.copy('a', 'b')
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.SET_CHILD_OVER_CHILD)
+        self.assertEqual(av.exception.error, NDFSLookupError.Type.SET_CHILD_OVER_CHILD)
 
         k['b'].delete('y')
         self.assertTrue(k['b'].empty())
@@ -249,13 +278,13 @@ class TestNestedDictFSViolations(unittest.TestCase):
         k = NestedDictFS(self.path, mode='c')
         with self.assertRaises(NDFSKeyError) as av:
             k.copy('a', 'b')
-        self.assertEqual(av.exception.error, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.NO_SUCH_KEY)
 
     def test_move_non_exist(self):
         k = NestedDictFS(self.path, mode='c')
         with self.assertRaises(NDFSKeyError) as av:
             k.move('a', 'b')
-        self.assertEqual(av.exception.error, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+        self.assertEqual(av.exception.error, NDFSKeyError.Type.NO_SUCH_KEY)
 
     def test_invalid_key(self):
         k = NestedDictFS(self.path, mode='c')
@@ -266,7 +295,7 @@ class TestNestedDictFSViolations(unittest.TestCase):
         for key in invalid_keys:
             with self.assertRaises(NDFSKeyError) as av:
                 k[key] = key
-            self.assertEqual(av.exception.error, NDFSKeyError.KeyErrorType.INVALID_KEY)
+            self.assertEqual(av.exception.error, NDFSKeyError.Type.INVALID_KEY)
 
         for key in valid_keys:
             k[key] = key
@@ -327,7 +356,6 @@ class TestNestedDictFS(unittest.TestCase):
     def test_get_self(self):
         k = NestedDictFS(self.path, mode='c')
         self.assertEqual(k, k[()])
-        self.assertEqual(k, k[...])
 
     def test_delete(self):
         k = NestedDictFS(self.path, mode='c')
@@ -349,7 +377,7 @@ class TestNestedDictFS(unittest.TestCase):
         k['b', 'c'] = 3
 
         keys = list(k.keys())
-        value_keys = list(k.value_keys())
+        value_keys = list(k.data_keys())
         child_keys = list(k.child_keys())
         self.assertCountEqual(keys, ['a', 'b'])
         self.assertCountEqual(value_keys, ['a'])
@@ -364,7 +392,7 @@ class TestNestedDictFS(unittest.TestCase):
         k['b', 'c'] = 3
 
         items = get_ret_list(k.items())
-        value_items = get_ret_list(k.value_items())
+        value_items = get_ret_list(k.data_items())
         child_items = get_ret_list(k.child_items())
 
         expected_value_items = [('a', 1)]
@@ -525,17 +553,38 @@ def get_key_value(*keys):
     return [(k, f"Value={k}") for k in keys]
 
 
+class FakeQuery:
+    def __getitem__(self, item):
+        return item
+
+
+fq = FakeQuery()
+
+
 class TestNestedDictFSGetSlice(unittest.TestCase):
     def setUp(self):
         self.path = os.path.join(tempfile.gettempdir(), random_folder())
         clean(self.path)
-        k = NestedDictFS(self.path, mode='c')
-        k['v'] = "Dummy"
+
+        d = {}
+        d['v'] = "Dummy"
         for i1 in ('a', 'b', 'c'):
-            k[i1, 'v'] = f"Dummy={i1}"
+            d.setdefault(i1, {})['v'] = f"Dummy={i1}"
             for i2 in ('1', '2', '3'):
                 for i3 in ('X', 'Y', 'Z'):
-                    k[i1, i2, i3] = f"Value={(i1, i2, i3)}"
+                    d.setdefault(i1, {}).setdefault(i2, {})[i3] = f"Value={(i1, i2, i3)}"
+        self.d = d
+
+        k = NestedDictFS(self.path, mode='c')
+        k.update(d, 10)
+
+        # k['v'] = "Dummy"
+        # for i1 in ('a', 'b', 'c'):
+        #     k[i1, 'v'] = f"Dummy={i1}"
+        #     for i2 in ('1', '2', '3'):
+        #         for i3 in ('X', 'Y', 'Z'):
+        #             k[i1, i2, i3] = f"Value={(i1, i2, i3)}"
+
         self.k = NestedDictFS(self.path, mode='c')
 
     def tearDown(self):
@@ -544,87 +593,88 @@ class TestNestedDictFSGetSlice(unittest.TestCase):
     def _get_key_path(self, *keys):
         return get_key_path(self.k, *keys)
 
-    def test_all(self):
-        ret = get_ret_list(self.k[:])
-        expected_ret = self._get_key_path('a', 'b', 'c')
-        expected_ret.append((('v',), 'Dummy'))
-        self.assertCountEqual(ret, expected_ret)
+    def _get_key_value(self, key):
+        d = self.d
+        for k in key:
+            d = d[k]
+        return d
 
-    def test_all_ellipsis(self):
-        ret = get_ret_list(self.k[:, ...])
-        expected_ret = self._get_key_path('a', 'b', 'c')
-        self.assertCountEqual(ret, expected_ret)
+    def _generic_query(self, query, *expected_keys):
+        expected_keys = get_keys(*expected_keys, force_tuple=True)
+        expected_values = [self._get_key_value(k) for k in expected_keys]
+
+        expected_child_items = [(k, self.k.key_path(k)) for k, v in zip(expected_keys, expected_values) if
+                                isinstance(k, dict)]
+        expected_data_items = [(k, v) for k, v in zip(expected_keys, expected_values) if not isinstance(k, dict)]
+
+        expected_child_keys = [k for k, v in expected_child_items]
+        expected_data_keys = [k for k, v in expected_data_items]
+
+        expected_child_values = [v for k, v in expected_child_items]
+        expected_data_values = [v for k, v in expected_data_items]
+
+        ret = get_ret_list(self.k.items[query])
+        self.assertCountEqual(ret, expected_child_items + expected_data_items)
+
+        ret = get_ret_list(self.k.child_items[query])
+        self.assertCountEqual(ret, expected_child_items)
+
+        ret = get_ret_list(self.k.data_items[query])
+        self.assertCountEqual(ret, expected_data_items)
+
+        ret = get_ret_list(self.k.keys[query])
+        self.assertCountEqual(ret, expected_keys)
+
+        ret = get_ret_list(self.k.child_keys[query])
+        self.assertCountEqual(ret, expected_child_keys)
+
+        ret = get_ret_list(self.k.data_keys[query])
+        self.assertCountEqual(ret, expected_data_keys)
+
+        ret = get_ret_list(self.k.values[query])
+        self.assertCountEqual(ret, expected_values)
+
+        ret = get_ret_list(self.k.child_values[query])
+        self.assertCountEqual(ret, expected_child_values)
+
+        ret = get_ret_list(self.k.data_values[query])
+        self.assertCountEqual(ret, expected_data_values)
+
+    def test_all(self):
+        self._generic_query(fq[:],
+                            'a', 'b', 'c', 'v')
 
     def test_sub_double_nested(self):
-        ret = get_ret_list(self.k['a', :, :])
-        expected_ret = get_key_value(*itertools.product(('a',), ('1', '2', '3'), ('X', 'Y', 'Z')))
-        self.assertCountEqual(ret, expected_ret)
-
-    def test_sub_double_nested_ellipsis(self):
-        ret = get_ret_list(self.k['a', :, :, ...])
-        self.assertCountEqual(ret, [])
+        self._generic_query(fq['a', :, :],
+                            *itertools.product(('a',), ('1', '2', '3'), ('X', 'Y', 'Z')))
 
     def test_first_double_nested(self):
-        ret = get_ret_list(self.k[:, :, 'X'])
-        expected_ret = get_key_value(*itertools.product(('a', 'b', 'c'), ('1', '2', '3'), ('X',)))
-        self.assertCountEqual(ret, expected_ret)
+        self._generic_query(fq[:, :, 'X'],
+                            *itertools.product(('a', 'b', 'c'), ('1', '2', '3'), ('X',)))
 
-    def test_first_double_nested_ellipsis(self):
-        with self.assertRaises(NDFSLookupError) as av:
-            _ = get_ret_list(self.k[:, :, 'X', ...])
-
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
-
-    def test_dummy_ellipsis(self):
-        with self.assertRaises(NDFSLookupError) as av:
-            _ = get_ret_list(self.k[:, 'v', ...])
-
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
+    def test_dummy_child(self):
+        self._generic_query(fq[:, 'v'],
+                            *itertools.product(('a', 'b', 'c'), ('v',)))
 
     def test_middle(self):
-        ret = get_ret_list(self.k['a', :, 'X'])
-        expected_ret = get_key_value(*itertools.product(('a',), ('1', '2', '3'), ('X',)))
-        self.assertCountEqual(ret, expected_ret)
-
-    def test_middle_ellipsis(self):
-        with self.assertRaises(NDFSLookupError) as av:
-            _ = get_ret_list(self.k['a', :, 'X', ...])
-
-        self.assertEqual(av.exception.error, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
+        self._generic_query(fq['a', :, 'X'],
+                            *itertools.product(('a',), ('1', '2', '3'), ('X',)))
 
     def test_sub_single(self):
-        ret = get_ret_list(self.k['a', :])
-        expected_ret = self._get_key_path(*itertools.product(('a',), ('1', '2', '3')))
-        expected_ret.append((('a', 'v'), 'Dummy=a'))
-        self.assertCountEqual(ret, expected_ret)
-
-    def test_sub_single_ellipsis(self):
-        ret = get_ret_list(self.k['a', :, ...])
-        expected_ret = self._get_key_path(*itertools.product(('a',), ('1', '2', '3')))
-        self.assertCountEqual(ret, expected_ret)
+        self._generic_query(fq['a', :],
+                            *itertools.product(('a',), ('1', '2', '3')))
 
     def test_first_single(self):
-        ret = get_ret_list(self.k[:, '1'])
-        expected_ret = self._get_key_path(*itertools.product(('a', 'b', 'c'), ('1',)))
-        self.assertCountEqual(ret, expected_ret)
-
-    def test_first_single_ellipsis(self):
-        ret = get_ret_list(self.k[:, '1', ...])
-        expected_ret = self._get_key_path(*itertools.product(('a', 'b', 'c'), ('1',)))
-        self.assertCountEqual(ret, expected_ret)
+        self._generic_query(fq[:, '1'],
+                            *itertools.product(('a', 'b', 'c'), ('1',)))
 
     def test_sandwich(self):
-        ret = get_ret_list(self.k[:, '1', :])
-        expected_ret = get_key_value(*itertools.product(('a', 'b', 'c'), ('1',), ('X', 'Y', 'Z')))
-        self.assertCountEqual(ret, expected_ret)
-
-    def test_sandwich_ellipsis(self):
-        ret = get_ret_list(self.k[:, '1', :, ...])
-        self.assertCountEqual(ret, [])
+        self._generic_query(fq[:, '1', :],
+                            *itertools.product(('a', 'b', 'c'), ('1',), ('X', 'Y', 'Z')))
 
     def test_asymmetric(self):
         val = 'asymmetric'
         self.k['a', 'e'] = val
-        ret = get_ret_list(self.k[:, 'e'])
+        ret = get_ret_list(self.k.items[:, 'e'])
         expected_ret = [(('a', 'e'), val)]
         self.assertCountEqual(ret, expected_ret)
