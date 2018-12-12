@@ -53,14 +53,12 @@ def get_ret_list(ret_obj):
     return ret
 
 
-def get_keys(*keys, force_tuple=True):
-    if force_tuple:
-        keys = [k if isinstance(k, tuple) else (k,) for k in keys]
-    return keys
+def get_keys(*keys):
+    return [k if isinstance(k, tuple) else (k,) for k in keys]
 
 
-def get_key_path(obj, *keys, force_tuple=True):
-    keys = get_keys(*keys, force_tuple=force_tuple)
+def get_key_path(obj, *keys):
+    keys = get_keys(*keys)
     return [(k, obj.key_path(k)) for k in keys]
 
 
@@ -384,7 +382,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertCountEqual(child_keys, ['b'])
 
         iter_keys = list(k)
-        self.assertCountEqual(iter_keys, ['a', 'b'])
+        self.assertCountEqual(iter_keys, [('a',), ('b',)])
 
     def test_items(self):
         k = NestedDictFS(self.path, mode='c')
@@ -395,8 +393,8 @@ class TestNestedDictFS(unittest.TestCase):
         value_items = get_ret_list(k.data_items())
         child_items = get_ret_list(k.child_items())
 
-        expected_value_items = [('a', 1)]
-        expected_child_items = get_key_path(k, 'b', force_tuple=False)
+        expected_value_items = [(('a',), 1)]
+        expected_child_items = get_key_path(k, 'b')
         expected_items = [*expected_child_items, *expected_value_items]
         self.assertCountEqual(items, expected_items)
         self.assertCountEqual(expected_value_items, value_items)
@@ -600,7 +598,7 @@ class TestNestedDictFSGetSlice(unittest.TestCase):
         return d
 
     def _generic_query(self, query, *expected_keys):
-        expected_keys = get_keys(*expected_keys, force_tuple=True)
+        expected_keys = get_keys(*expected_keys)
         expected_values = [self._get_key_value(k) for k in expected_keys]
 
         expected_child_items = [(k, self.k.key_path(k)) for k, v in zip(expected_keys, expected_values) if

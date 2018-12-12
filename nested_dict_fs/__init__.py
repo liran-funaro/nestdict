@@ -209,8 +209,10 @@ class NestedDictFS:
         if not allow_slice and any(isinstance(k, slice) for k in item):
             raise NDFSKeyError(self, item, NDFSKeyError.Type.SLICE)
 
-        item = tuple(map(str, item))
+        item = tuple([str(k) if not isinstance(k, slice) else k for k in item])
         for k in item:
+            if isinstance(k, slice):
+                continue
             if k in ('.', '..') or os.path.sep in k:
                 raise NDFSKeyError(self, item, NDFSKeyError.Type.INVALID_KEY)
 
