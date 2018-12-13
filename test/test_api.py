@@ -48,10 +48,10 @@ class TestNestedDictFS(unittest.TestCase):
         c = k.get_child('a')
         self.assertEqual(k.key_path('a'), c.data_path)
 
-    def test_get_value(self):
+    def test_get_data(self):
         k = NestedDictFS(self.path, mode='c')
         k['a'] = 1
-        c = k.get_value('a')
+        c = k.get_data('a')
         self.assertEqual(c, 1)
 
     def test_get_default_value(self):

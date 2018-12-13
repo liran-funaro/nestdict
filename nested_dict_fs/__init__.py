@@ -315,6 +315,7 @@ class NestedDictFS:
 
     def get_direct(self, item, default_value=None, raise_err=True,
                    include_child=True, include_data=True, create_child=False):
+        """ Get an item directly (skipping the cache) """
         item_path = self.key_path(item)
         if item_path == self.data_path:
             return self
@@ -324,6 +325,7 @@ class NestedDictFS:
 
     def get_cached(self, item, default_value=None, raise_err=True,
                    include_child=True, include_data=True, create_child=False):
+        """ Get an item. If it is already in the cache, than a cached item will be returned. """
         item_path = self.key_path(item)
         if item_path == self.data_path:
             return self
@@ -345,15 +347,16 @@ class NestedDictFS:
         return tuple(ret)
 
     @staticmethod
-    def _split_list_by_type(lst, split_type):
-        type_idx = [i for i, k in enumerate(lst) if isinstance(k, split_type)]
+    def _split_list_by_type(lst, *split_types):
+        items_type = ((i, k, type(k)) for i, k in enumerate(lst))
+        type_idx = [(i, k, t) for i, k, t in items_type if t in split_types]
 
         ret_lst = []
         prev_idx = 0
-        for idx in type_idx:
-            ret_lst.append(lst[prev_idx:idx])
-            ret_lst.append(split_type)
-            prev_idx = idx + 1
+        for i, k, t in type_idx:
+            ret_lst.append(lst[prev_idx:i])
+            ret_lst.append(t)
+            prev_idx = i + 1
         if prev_idx < len(lst):
             ret_lst.append(lst[prev_idx:])
 
@@ -385,10 +388,12 @@ class NestedDictFS:
                 yield item, item_path
 
     def walk(self, include_child=True, include_data=True, yield_keys=True, yield_values=True, topdown=True):
+        """ Walk the current item subtree and yields key/value, key or value """
         for item, item_path in self._internal_walk(include_child, include_data, topdown):
             yield self._yield_item(item, item_path, yield_keys, yield_values)
 
     def search(self, item, include_child=True, include_data=True, yield_keys=True, yield_values=True):
+        """ Search the current sub tree """
         item = self._internal_verify_item(item, is_search_key=True)
         if len(item) == 0:
             raise ValueError("Search term must be with at least one criteria.")
@@ -548,7 +553,7 @@ class NestedDictFS:
     def get_child(self, item):
         return self.get_cached(item, include_child=True, include_data=False, create_child=True)
 
-    def get_value(self, item):
+    def get_data(self, item):
         return self.get_cached(item, include_child=False, include_data=True, create_child=False)
 
     def put(self, item, value):

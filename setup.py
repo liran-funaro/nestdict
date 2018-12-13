@@ -25,7 +25,10 @@ setup(
     description="Permanent hierarchical storage using file-system directories with dict-like API",
     author="Liran Funaro",
     author_email="fonaro+nested_dict_fs@gmail.com",
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     url="https://github.com/fonaro/nested-dict-fs",
+    keywords='key-value-store dict file-system',
     classifiers=[
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
@@ -35,6 +38,5 @@ setup(
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    long_description=open('README.md').read(),
     install_requires=['lru-dict', 'numpy', 'msgpack', 'msgpack-numpy'],
 )
