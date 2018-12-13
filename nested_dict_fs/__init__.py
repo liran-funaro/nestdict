@@ -152,6 +152,7 @@ class NestedDictFS:
         return str(self)
 
     def key_path(self, item):
+        """ Returns the data path of an item """
         item = self._internal_verify_item(item)
         return self._unsafe_key_path(item)
 
@@ -196,8 +197,6 @@ class NestedDictFS:
             return self.read_method(f)
 
     def _internal_get_child(self, item_path, create=False):
-        if item_path == self.data_path:
-            return self
         mode = self.mode if not create else 'c'
         return self.__class__(item_path, mode=mode, shared_cache=self.cache, store_engine=self.store_engine)
 
@@ -297,6 +296,10 @@ class NestedDictFS:
         return self._internal_get_cached(item, item_path, default_value, raise_err, include_child, include_data,
                                          create_child)
 
+    ######################################################################################################
+    # Search methods
+    ######################################################################################################
+
     @staticmethod
     def _join_item_key(*all_items):
         ret = []
@@ -308,7 +311,7 @@ class NestedDictFS:
         return tuple(ret)
 
     @staticmethod
-    def split_list_by_type(lst, split_type):
+    def _split_list_by_type(lst, split_type):
         type_idx = [i for i, k in enumerate(lst) if isinstance(k, split_type)]
 
         ret_lst = []
@@ -322,19 +325,23 @@ class NestedDictFS:
 
         return ret_lst
 
-    def _yield_slice(self, item, item_path, return_keys=True, return_values=True):
-        if not return_values:
+    def _yield_slice(self, item, item_path, yield_keys=True, yield_values=True):
+        if len(item) == 1:
+            item = item[0]
+        if not yield_values:
             return item
 
         ret_val = self._internal_get_cached(item, item_path)
-        if return_keys:
+        if yield_keys:
             return item, ret_val
         else:
             return ret_val
 
     def search(self, item, include_child=True, include_data=True, yield_keys=True, yield_values=True):
         item = self._internal_verify_item(item, allow_slice=True)
-        slice_list = self.split_list_by_type(item, slice)
+        if len(item) == 0:
+            raise ValueError("Search term must be with at least one criteria.")
+        slice_list = self._split_list_by_type(item, slice)
 
         child_q = deque()
         child_q.append(((), slice_list))
@@ -510,7 +517,7 @@ class NestedDictFS:
 
     def update(self, input_dict, max_depth=0):
         if not isinstance(input_dict, dict):
-            ValueError("Input must be a dict.")
+            raise ValueError("Input must be a dict.")
 
         if max_depth < 1:
             for k, v in input_dict.items():
@@ -579,8 +586,8 @@ class NestedDictIterator:
             include_child = self.include_child
         if include_data is None:
             include_data = self.include_data
-        return self.owner.search(slice(None), include_child, include_data, self.yield_keys, self.yield_values)
+        yield from self.owner.search(slice(None), include_child, include_data, self.yield_keys, self.yield_values)
 
     def __iter__(self):
-        return self.owner.search(slice(None), self.include_child, self.include_data,
-                                 self.yield_keys, self.yield_values)
+        yield from self.owner.search(slice(None), self.include_child, self.include_data,
+                                     self.yield_keys, self.yield_values)
