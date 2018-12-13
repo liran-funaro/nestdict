@@ -267,3 +267,8 @@ class TestNestedDictFSErrors(unittest.TestCase):
         k = NestedDictFS(self.path, mode='c')
         with self.assertRaises(ValueError):
             list(k.search((), yield_keys=True, yield_values=True))
+
+    def test_not_sub_path_key(self):
+        k = NestedDictFS(self.path, mode='c')
+        with self.assertRaises(ValueError):
+            k.path_key(os.path.join(self.path, '..'))

@@ -29,7 +29,7 @@ class FakeQuery:
 fq = FakeQuery()
 
 
-class TestNestedDictFSGetSlice(unittest.TestCase):
+class TestNestedDictFSSearch(unittest.TestCase):
     def setUp(self):
         self.path = setup_test()
 
@@ -137,3 +137,22 @@ class TestNestedDictFSGetSlice(unittest.TestCase):
         ret = get_ret_list_items(self.k.items[:, 'e'])
         expected_ret = [(('a', 'e'), val)]
         self.assertCountEqual(ret, expected_ret)
+
+    def test_walk(self):
+        ret = list(self.k.walk(yield_values=False))
+        expected_keys = get_keys('a', 'b', 'c', 'v')
+        expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3', 'v'))))
+        expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3'), ('X', 'Y', 'Z'))))
+        self.assertCountEqual(ret, expected_keys)
+
+        ret = list(self.k.walk(yield_values=False, include_child=False))
+        expected_keys = get_keys('v')
+        expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('v',))))
+        expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3'), ('X', 'Y', 'Z'))))
+        self.assertCountEqual(ret, expected_keys)
+
+        ret = list(self.k.walk(yield_values=False, include_data=False))
+        expected_keys = get_keys('a', 'b', 'c')
+        expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3'))))
+        self.assertCountEqual(ret, expected_keys)
+

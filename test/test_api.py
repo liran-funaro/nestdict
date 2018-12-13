@@ -285,3 +285,17 @@ class TestNestedDictFS(unittest.TestCase):
         self.k.update({'a': 1, 'b': {'c': 2}}, max_depth=1)
         self.assertEqual(self.k['a'], 1)
         self.assertEqual(self.k['b'].data_path, self.k.key_path('b'))
+
+    def test_path_key(self):
+        p = self.k.path_key(self.path)
+        self.assertEqual(p, ())
+
+        p = self.k.path_key(os.path.join(self.path, '.'))
+        self.assertEqual(p, ())
+
+        p = self.k.path_key(os.path.join(self.path, 'a'))
+        self.assertEqual(p, 'a')
+
+        p = self.k.path_key(os.path.join(self.path, 'a', 'b'))
+        self.assertEqual(p, ('a', 'b'))
+

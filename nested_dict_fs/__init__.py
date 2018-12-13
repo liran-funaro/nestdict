@@ -104,23 +104,27 @@ class NestedDictFS:
             and 'c' for allow creation of a new data path (lazy).
         :param cache_size: Define the cache size to use. Defaults to 128.
         :param shared_cache: Can be used to pass a cache object from another instance to be shared (ignores cache_size).
-        :param store_engine: Use one of the following: msgpack, msgpack-numpy (default)
-            The class does not infer the store engine from the data path, so it is
+        :param store_engine: The class does not infer the store engine from the data path, so it is
             up to the programmer to know the store engine used for an existing data path.
+            Use one of the following:
+            - plain: convert any object plain text (utf-8).
+            - binary: attempt to write any object directly to a file.
+            - pickle: python default pickle implementation.
+            - msgpack: uses msgpack to store objects.
+            - msgpack-numpy (default): uses msgpack with msgpack_numpy to also support numpy arrays.
         :param compress_level: See `gzip`.
         """
-        if isinstance(data_path, str):
-            self.data_path = data_path
-        elif isinstance(data_path, self.__class__):
+        if isinstance(data_path, self.__class__):
             parent = data_path
+            data_path = parent.data_path
             shared_cache = parent.cache
             store_engine = parent.store_engine
             compress_level = parent.compress_level
-            self.data_path = parent.data_path
-        else:
+        if not isinstance(data_path, str):
             raise TypeError(
                 f"data_path must be a string or a {self.__class__.__name__} object. Not a {type(data_path)}.")
 
+        self.data_path = self._normalize_path(data_path)
         self.mode = mode
         self.writable = any(k in mode for k in 'wc')
         self.store_engine = store_engine
@@ -156,12 +160,42 @@ class NestedDictFS:
         item = self._internal_verify_item(item)
         return self._unsafe_key_path(item)
 
+    def path_key(self, path):
+        """ Returns the key of a data path """
+        path = self._normalize_path(path)
+        if path == self.data_path:
+            return ()
+        common = os.path.commonpath([self.data_path, path])
+        if common != self.data_path:
+            raise ValueError("Sub path must be in the current path subtree.")
+        item = self._unsafe_path_key(path)
+        if len(item) == 1:
+            return item[0]
+        else:
+            return item
+
     ######################################################################################################
     # Internal helpers
     ######################################################################################################
 
+    @staticmethod
+    def _normalize_path(path):
+        """
+        realpath: Return the canonical path of the specified filename, eliminating any symbolic links encountered in
+            the path (if they are supported by the operating system).
+        normcase: Normalize the case of a pathname. On Unix and Mac OS X, this returns the path unchanged;
+            on case-insensitive filesystems, it converts the path to lowercase.
+            On Windows, it also converts forward slashes to backward slashes.
+        abspath: Return a normalized absolutized version of the pathname path.
+        """
+        return os.path.abspath(os.path.normcase(os.path.realpath(path)))
+
     def _unsafe_key_path(self, item):
         return os.path.join(self.data_path, *item)
+
+    def _unsafe_path_key(self, path):
+        sub_path = os.path.relpath(path, self.data_path)
+        return tuple(sub_path.split(os.path.sep))
 
     def _internal_list_dir(self):
         if os.path.isdir(self.data_path):
@@ -182,30 +216,30 @@ class NestedDictFS:
             if self._internal_path_exists(path, include_child, include_data):
                 yield k, path
 
-    def _internal_open(self, filepath, mode='r'):
+    def _internal_open(self, filepath, mode='rb'):
         if self.compress_level == 0:
-            return open(filepath, mode+'b')
+            return open(filepath, mode)
         else:
-            return gzip.open(filepath, mode+'b', compresslevel=self.compress_level)
+            return gzip.open(filepath, mode, compresslevel=self.compress_level)
 
     def _internal_write(self, filepath, obj, append=False):
-        with self._internal_open(filepath, 'a' if append else 'w') as f:
+        with self._internal_open(filepath, 'ab' if append else 'wb') as f:
             self.write_method(f, obj)
 
     def _internal_read(self, filepath):
-        with self._internal_open(filepath, 'r') as f:
+        with self._internal_open(filepath, 'rb') as f:
             return self.read_method(f)
 
     def _internal_get_child(self, item_path, create=False):
         mode = self.mode if not create else 'c'
         return self.__class__(item_path, mode=mode, shared_cache=self.cache, store_engine=self.store_engine)
 
-    def _internal_verify_item(self, item, allow_slice=False):
+    def _internal_verify_item(self, item, is_search_key=False):
         if type(item) not in (list, tuple):
             item = (item,)
         if Ellipsis in item:
             raise NDFSKeyError(self, item, NDFSKeyError.Type.ELLIPSIS)
-        if not allow_slice and any(isinstance(k, slice) for k in item):
+        if not is_search_key and any(isinstance(k, slice) for k in item):
             raise NDFSKeyError(self, item, NDFSKeyError.Type.SLICE)
 
         item = tuple([str(k) if not isinstance(k, slice) else k for k in item])
@@ -215,7 +249,7 @@ class NestedDictFS:
             if k in ('.', '..') or os.path.sep in k:
                 raise NDFSKeyError(self, item, NDFSKeyError.Type.INVALID_KEY)
 
-        if allow_slice:
+        if is_search_key:
             return item
 
         for i in range(1, len(item)):
@@ -325,7 +359,7 @@ class NestedDictFS:
 
         return ret_lst
 
-    def _yield_slice(self, item, item_path, yield_keys=True, yield_values=True):
+    def _yield_item(self, item, item_path, yield_keys=True, yield_values=True):
         if len(item) == 1:
             item = item[0]
         if not yield_values:
@@ -337,8 +371,25 @@ class NestedDictFS:
         else:
             return ret_val
 
+    def _internal_walk(self, include_child=True, include_data=True, topdown=True):
+        for root, dirs, files in os.walk(self.data_path, topdown=topdown):
+            iter_items = []
+            if include_child:
+                iter_items.extend(dirs)
+            if include_data:
+                iter_items.extend(files)
+
+            for item_name in iter_items:
+                item_path = os.path.join(root, item_name)
+                item = self._unsafe_path_key(item_path)
+                yield item, item_path
+
+    def walk(self, include_child=True, include_data=True, yield_keys=True, yield_values=True, topdown=True):
+        for item, item_path in self._internal_walk(include_child, include_data, topdown):
+            yield self._yield_item(item, item_path, yield_keys, yield_values)
+
     def search(self, item, include_child=True, include_data=True, yield_keys=True, yield_values=True):
-        item = self._internal_verify_item(item, allow_slice=True)
+        item = self._internal_verify_item(item, is_search_key=True)
         if len(item) == 0:
             raise ValueError("Search term must be with at least one criteria.")
         slice_list = self._split_list_by_type(item, slice)
@@ -355,7 +406,7 @@ class NestedDictFS:
                 cur_path = self._unsafe_key_path(joined_k)
                 if is_final:
                     if self._internal_path_exists(cur_path, include_child, include_data):
-                        yield self._yield_slice(joined_k, cur_path, yield_keys, yield_values)
+                        yield self._yield_item(joined_k, cur_path, yield_keys, yield_values)
                 elif os.path.isdir(cur_path):
                     child_q.append((joined_k, next_slice_list))
             else:
@@ -368,7 +419,7 @@ class NestedDictFS:
                     for sub_k, _ in child._internal_keys(include_child=include_child, include_data=include_data):
                         joined_k = self._join_item_key(pre_k, sub_k)
                         cur_path = self._unsafe_key_path(joined_k)
-                        yield self._yield_slice(joined_k, cur_path, yield_keys, yield_values)
+                        yield self._yield_item(joined_k, cur_path, yield_keys, yield_values)
 
     ######################################################################################################
     # Internal modifiers
