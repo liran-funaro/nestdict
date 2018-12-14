@@ -60,7 +60,7 @@ def get_ret_list_items(ret_obj):
 
 
 def get_keys(*keys):
-    return [k if isinstance(k, tuple) and len(k) != 1 else k[0] for k in keys]
+    return [k if (isinstance(k, tuple) and len(k) != 1) or isinstance(k, str) else k[0] for k in keys]
 
 
 def get_key_path(obj, *keys):

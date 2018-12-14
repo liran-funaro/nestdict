@@ -205,7 +205,7 @@ class NestedDictFS:
 
     def _internal_keys_paths(self):
         for k in self._internal_list_dir():
-            yield k, self._unsafe_key_path(k)
+            yield k, self._unsafe_key_path((k,))
 
     @staticmethod
     def _internal_path_exists(path, include_child=True, include_data=True):

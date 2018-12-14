@@ -88,11 +88,11 @@ class TestNestedDictFS(unittest.TestCase):
 
     def test_keys(self):
         k = NestedDictFS(self.path, mode='c')
-        k['a'] = 1
-        k['b', 'c'] = 3
+        k['abc'] = 1
+        k['def', 'ghi'] = 3
 
-        expected_data_keys = get_keys('a')
-        expected_child_keys = get_keys('b')
+        expected_data_keys = get_keys('abc')
+        expected_child_keys = get_keys('def')
 
         keys = list(k.keys())
         data_keys = list(k.data_keys())
@@ -109,7 +109,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertCountEqual(child_keys, expected_child_keys)
 
         iter_keys = list(k)
-        self.assertCountEqual(iter_keys, ['a', 'b'])
+        self.assertCountEqual(iter_keys, ['abc', 'def'])
 
     def test_values(self):
         k = NestedDictFS(self.path, mode='c')
