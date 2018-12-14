@@ -22,6 +22,8 @@ import gzip
 import shutil
 from lru import LRU
 from enum import Enum, auto
+from collections import deque
+
 from nested_dict_fs import store_engines
 
 
@@ -39,27 +41,27 @@ class NDFSAccessViolation(NDFSException):
 
 
 class NDFSLookupError(NDFSException):
-    class LookupErrorType(Enum):
+    class Type(Enum):
         NOT_INCLUDE_CHILD = auto()
-        NOT_INCLUDE_VALUE = auto()
-        VALUE_SUB_ITEM = auto()
-        SET_VALUE_OVER_CHILD = auto()
-        SET_CHILD_OVER_VALUE = auto()
+        NOT_INCLUDE_DATA = auto()
+        DATA_SUB_ITEM = auto()
+        SET_DATA_OVER_CHILD = auto()
+        SET_CHILD_OVER_DATA = auto()
         SET_CHILD_OVER_CHILD = auto()
 
-    def __init__(self, obj, item, error: LookupErrorType, sub_item=None):
+    def __init__(self, obj, item, error: Type, sub_item=None):
         msg = f"Lookup error in {obj} with item {item}."
-        if error == self.LookupErrorType.NOT_INCLUDE_CHILD:
+        if error == self.Type.NOT_INCLUDE_CHILD:
             msg = f"Item {item} is a child but children were not included in the search."
-        elif error == self.LookupErrorType.NOT_INCLUDE_VALUE:
-            msg = f"Item {item} is a value but values were not included in the search."
-        elif error == self.LookupErrorType.VALUE_SUB_ITEM:
-            msg = f"Sub item {sub_item} is a value but requested {item}."
-        elif error == self.LookupErrorType.SET_VALUE_OVER_CHILD:
-            msg = f"Cannot set/copy/move a value to an existing child. Must remove subtree {item}."
-        elif error == self.LookupErrorType.SET_CHILD_OVER_VALUE:
-            msg = f"Cannot copy/move a child to an existing value. Must remove value {item}."
-        elif error == self.LookupErrorType.SET_CHILD_OVER_CHILD:
+        elif error == self.Type.NOT_INCLUDE_DATA:
+            msg = f"Item {item} is data but data were not included in the search."
+        elif error == self.Type.DATA_SUB_ITEM:
+            msg = f"Sub item {sub_item} is a data but requested its child {item}."
+        elif error == self.Type.SET_DATA_OVER_CHILD:
+            msg = f"Cannot set/copy/move data to an existing child. Must remove subtree {item}."
+        elif error == self.Type.SET_CHILD_OVER_DATA:
+            msg = f"Cannot copy/move a child to an existing data. Must remove data {item}."
+        elif error == self.Type.SET_CHILD_OVER_CHILD:
             msg = f"Cannot copy/move a child to an existing non empty child. Must remove subtree {item}."
 
         super().__init__(obj, item, msg)
@@ -68,19 +70,22 @@ class NDFSLookupError(NDFSException):
 
 
 class NDFSKeyError(NDFSException):
-    class KeyErrorType(Enum):
+    class Type(Enum):
         NO_SUCH_KEY = auto()
         INVALID_KEY = auto()
         ELLIPSIS = auto()
+        SLICE = auto()
 
-    def __init__(self, obj, item, error: KeyErrorType):
+    def __init__(self, obj, item, error: Type):
         msg = f"Key error in {obj} with item {item}."
-        if error == self.KeyErrorType.NO_SUCH_KEY:
+        if error == self.Type.NO_SUCH_KEY:
             msg = f"Item {item} does not exist in {obj}."
-        elif error == self.KeyErrorType.INVALID_KEY:
+        elif error == self.Type.INVALID_KEY:
             msg = f"Invalid key: {item}."
-        elif error == self.KeyErrorType.ELLIPSIS:
-            msg = "Ellipsis (...) may only be used as the final nested key."
+        elif error == self.Type.ELLIPSIS:
+            msg = "Ellipsis (...) may not be used as a key."
+        elif error == self.Type.SLICE:
+            msg = "Slice (:) may not be used as a key."
 
         super().__init__(obj, item, msg)
         self.error = error
@@ -99,23 +104,27 @@ class NestedDictFS:
             and 'c' for allow creation of a new data path (lazy).
         :param cache_size: Define the cache size to use. Defaults to 128.
         :param shared_cache: Can be used to pass a cache object from another instance to be shared (ignores cache_size).
-        :param store_engine: Use one of the following: msgpack, msgpack-numpy (default)
-            The class does not infer the store engine from the data path, so it is
+        :param store_engine: The class does not infer the store engine from the data path, so it is
             up to the programmer to know the store engine used for an existing data path.
+            Use one of the following:
+            - plain: convert any object plain text (utf-8).
+            - binary: attempt to write any object directly to a file.
+            - pickle: python default pickle implementation.
+            - msgpack: uses msgpack to store objects.
+            - msgpack-numpy (default): uses msgpack with msgpack_numpy to also support numpy arrays.
         :param compress_level: See `gzip`.
         """
-        if isinstance(data_path, str):
-            self.data_path = data_path
-        elif isinstance(data_path, self.__class__):
+        if isinstance(data_path, self.__class__):
             parent = data_path
+            data_path = parent.data_path
             shared_cache = parent.cache
             store_engine = parent.store_engine
             compress_level = parent.compress_level
-            self.data_path = parent.data_path
-        else:
+        if not isinstance(data_path, str):
             raise TypeError(
                 f"data_path must be a string or a {self.__class__.__name__} object. Not a {type(data_path)}.")
 
+        self.data_path = self._normalize_path(data_path)
         self.mode = mode
         self.writable = any(k in mode for k in 'wc')
         self.store_engine = store_engine
@@ -146,61 +155,123 @@ class NestedDictFS:
     def __repr__(self):
         return str(self)
 
-    def key_path(self, key):
-        if type(key) in (list, tuple):
-            return os.path.join(self.data_path, *map(str, key))
+    def key_path(self, item):
+        """ Returns the data path of an item """
+        item = self._internal_verify_item(item)
+        return self._unsafe_key_path(item)
+
+    def path_key(self, path):
+        """ Returns the key of a data path """
+        path = self._normalize_path(path)
+        if path == self.data_path:
+            return ()
+        common = os.path.commonpath([self.data_path, path])
+        if common != self.data_path:
+            raise ValueError("Sub path must be in the current path subtree.")
+        item = self._unsafe_path_key(path)
+        if len(item) == 1:
+            return item[0]
         else:
-            return os.path.join(self.data_path, str(key))
+            return item
 
     ######################################################################################################
     # Internal helpers
     ######################################################################################################
 
-    def _internal_open(self, filepath, mode='r'):
-        if self.compress_level == 0:
-            return open(filepath, mode+'b')
+    @staticmethod
+    def _normalize_path(path):
+        """
+        realpath: Return the canonical path of the specified filename, eliminating any symbolic links encountered in
+            the path (if they are supported by the operating system).
+        normcase: Normalize the case of a pathname. On Unix and Mac OS X, this returns the path unchanged;
+            on case-insensitive filesystems, it converts the path to lowercase.
+            On Windows, it also converts forward slashes to backward slashes.
+        abspath: Return a normalized absolutized version of the pathname path.
+        """
+        return os.path.abspath(os.path.normcase(os.path.realpath(path)))
+
+    def _unsafe_key_path(self, item):
+        return os.path.join(self.data_path, *item)
+
+    def _unsafe_path_key(self, path):
+        sub_path = os.path.relpath(path, self.data_path)
+        return tuple(sub_path.split(os.path.sep))
+
+    def _internal_list_dir(self):
+        if os.path.isdir(self.data_path):
+            return sorted(os.listdir(self.data_path))
         else:
-            return gzip.open(filepath, mode+'b', compresslevel=self.compress_level)
+            return []
+
+    def _internal_keys_paths(self):
+        for k in self._internal_list_dir():
+            yield k, self._unsafe_key_path(k)
+
+    @staticmethod
+    def _internal_path_exists(path, include_child=True, include_data=True):
+        return (include_data and os.path.isfile(path)) or (include_child and os.path.isdir(path))
+
+    def _internal_keys(self, include_child=True, include_data=True):
+        for k, path in self._internal_keys_paths():
+            if self._internal_path_exists(path, include_child, include_data):
+                yield k, path
+
+    def _internal_open(self, filepath, mode='rb'):
+        if self.compress_level == 0:
+            return open(filepath, mode)
+        else:
+            return gzip.open(filepath, mode, compresslevel=self.compress_level)
 
     def _internal_write(self, filepath, obj, append=False):
-        with self._internal_open(filepath, 'a' if append else 'w') as f:
+        with self._internal_open(filepath, 'ab' if append else 'wb') as f:
             self.write_method(f, obj)
 
     def _internal_read(self, filepath):
-        with self._internal_open(filepath, 'r') as f:
+        with self._internal_open(filepath, 'rb') as f:
             return self.read_method(f)
 
     def _internal_get_child(self, item_path, create=False):
         mode = self.mode if not create else 'c'
         return self.__class__(item_path, mode=mode, shared_cache=self.cache, store_engine=self.store_engine)
 
-    def _internal_verify_item(self, item):
+    def _internal_verify_item(self, item, is_search_key=False):
         if type(item) not in (list, tuple):
             item = (item,)
-        item = tuple(map(str, item))
+        if Ellipsis in item:
+            raise NDFSKeyError(self, item, NDFSKeyError.Type.ELLIPSIS)
+        if not is_search_key and any(isinstance(k, slice) for k in item):
+            raise NDFSKeyError(self, item, NDFSKeyError.Type.SLICE)
+
+        item = tuple([str(k) if not isinstance(k, slice) else k for k in item])
         for k in item:
+            if isinstance(k, slice):
+                continue
             if k in ('.', '..') or os.path.sep in k:
-                raise NDFSKeyError(self, item, NDFSKeyError.KeyErrorType.INVALID_KEY)
+                raise NDFSKeyError(self, item, NDFSKeyError.Type.INVALID_KEY)
+
+        if is_search_key:
+            return item
 
         for i in range(1, len(item)):
             sub_item = item[:i]
-            sub_item_path = self.key_path(sub_item)
-            if os.path.isdir(sub_item_path):
-                continue
-            elif os.path.isfile(sub_item_path):
-                raise NDFSLookupError(self, item, NDFSLookupError.LookupErrorType.VALUE_SUB_ITEM, sub_item)
+            sub_item_path = self._unsafe_key_path(sub_item)
+            if os.path.isfile(sub_item_path):
+                raise NDFSLookupError(self, item, NDFSLookupError.Type.DATA_SUB_ITEM, sub_item)
+
+        return item
 
     def _internal_get_direct(self, item, item_path, default_value=None, raise_err=True,
-                             include_child=True, include_value=True, create_child=False):
+                             include_child=True, include_data=True, create_child=False):
         include_child |= create_child
+
         if os.path.isdir(item_path):
             if not include_child:
-                raise NDFSLookupError(self, item, NDFSLookupError.LookupErrorType.NOT_INCLUDE_CHILD)
+                raise NDFSLookupError(self, item, NDFSLookupError.Type.NOT_INCLUDE_CHILD)
             return self._internal_get_child(item_path, create=False)
 
         if os.path.isfile(item_path):
-            if not include_value:
-                raise NDFSLookupError(self, item, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
+            if not include_data:
+                raise NDFSLookupError(self, item, NDFSLookupError.Type.NOT_INCLUDE_DATA)
             return self._internal_read(item_path)
 
         if create_child:
@@ -209,15 +280,12 @@ class NestedDictFS:
             else:
                 raise NDFSAccessViolation(self, item)
         elif raise_err:
-            raise NDFSKeyError(self, item, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+            raise NDFSKeyError(self, item, NDFSKeyError.Type.NO_SUCH_KEY)
 
         return default_value
 
-    def _internal_get_cached(self, item, default_value=None, raise_err=True,
+    def _internal_get_cached(self, item, item_path, default_value=None, raise_err=True,
                              include_child=True, include_value=True, create_child=False):
-        self._internal_verify_item(item)
-        item_path = self.key_path(item)
-
         ret_stat, ret_value = self.cache.get(item_path, (None, default_value))
         try:
             cur_stat = os.stat(item_path)
@@ -235,11 +303,38 @@ class NestedDictFS:
 
         is_child = isinstance(ret_value, self.__class__)
         if is_child and not include_child:
-            raise NDFSLookupError(self, item, NDFSLookupError.LookupErrorType.NOT_INCLUDE_CHILD)
+            raise NDFSLookupError(self, item, NDFSLookupError.Type.NOT_INCLUDE_CHILD)
         elif not is_child and not include_value and ret_value is not default_value:
-            raise NDFSLookupError(self, item, NDFSLookupError.LookupErrorType.NOT_INCLUDE_VALUE)
+            raise NDFSLookupError(self, item, NDFSLookupError.Type.NOT_INCLUDE_DATA)
 
         return ret_value
+
+    ######################################################################################################
+    # Specialization GET methods
+    ######################################################################################################
+
+    def get_direct(self, item, default_value=None, raise_err=True,
+                   include_child=True, include_data=True, create_child=False):
+        """ Get an item directly (skipping the cache) """
+        item_path = self.key_path(item)
+        if item_path == self.data_path:
+            return self
+        include_child |= create_child
+        return self._internal_get_direct(item, item_path, default_value, raise_err, include_child, include_data,
+                                         create_child)
+
+    def get_cached(self, item, default_value=None, raise_err=True,
+                   include_child=True, include_data=True, create_child=False):
+        """ Get an item. If it is already in the cache, than a cached item will be returned. """
+        item_path = self.key_path(item)
+        if item_path == self.data_path:
+            return self
+        return self._internal_get_cached(item, item_path, default_value, raise_err, include_child, include_data,
+                                         create_child)
+
+    ######################################################################################################
+    # Search methods
+    ######################################################################################################
 
     @staticmethod
     def _join_item_key(*all_items):
@@ -251,65 +346,89 @@ class NestedDictFS:
                 ret.append(item)
         return tuple(ret)
 
-    def _slice_get(self, item, slice_idx, include_child=True, include_value=True):
-        slice_list = []
-        prev_slice_idx = 0
-        for cur_slice_idx in slice_idx:
-            slice_list.append(item[prev_slice_idx:cur_slice_idx])
-            slice_list.append(slice(None))
-            prev_slice_idx = cur_slice_idx + 1
-        if prev_slice_idx < len(item):
-            slice_list.append(item[prev_slice_idx:])
+    @staticmethod
+    def _split_list_by_type(lst, *split_types):
+        items_type = ((i, k, type(k)) for i, k in enumerate(lst))
+        type_idx = [(i, k, t) for i, k, t in items_type if t in split_types]
 
-        child_q = [((), slice_list, self)]
+        ret_lst = []
+        prev_idx = 0
+        for i, k, t in type_idx:
+            ret_lst.append(lst[prev_idx:i])
+            ret_lst.append(t)
+            prev_idx = i + 1
+        if prev_idx < len(lst):
+            ret_lst.append(lst[prev_idx:])
+
+        return ret_lst
+
+    def _yield_item(self, item, item_path, yield_keys=True, yield_values=True):
+        if len(item) == 1:
+            item = item[0]
+        if not yield_values:
+            return item
+
+        ret_val = self._internal_get_cached(item, item_path)
+        if yield_keys:
+            return item, ret_val
+        else:
+            return ret_val
+
+    def _internal_walk(self, include_child=True, include_data=True, topdown=True):
+        for root, dirs, files in os.walk(self.data_path, topdown=topdown):
+            iter_items = []
+            if include_child:
+                iter_items.extend(dirs)
+            if include_data:
+                iter_items.extend(files)
+
+            for item_name in iter_items:
+                item_path = os.path.join(root, item_name)
+                item = self._unsafe_path_key(item_path)
+                yield item, item_path
+
+    def walk(self, include_child=True, include_data=True, yield_keys=True, yield_values=True, topdown=True):
+        """ Walk the current item subtree and yields key/value, key or value """
+        for item, item_path in self._internal_walk(include_child, include_data, topdown):
+            yield self._yield_item(item, item_path, yield_keys, yield_values)
+
+    def search(self, item, include_child=True, include_data=True, yield_keys=True, yield_values=True):
+        """ Search the current sub tree """
+        item = self._internal_verify_item(item, is_search_key=True)
+        if len(item) == 0:
+            raise ValueError("Search term must be with at least one criteria.")
+        slice_list = self._split_list_by_type(item, slice)
+
+        child_q = deque()
+        child_q.append(((), slice_list))
         while child_q:
-            pre_k, cur_slice_list, child = child_q.pop(0)
+            pre_k, cur_slice_list = child_q.popleft()
             cur_k, next_slice_list = cur_slice_list[0], cur_slice_list[1:]
             is_final = len(next_slice_list) == 0
-            if not is_final:
-                kwargs = dict(include_child=True, include_value=False)
-            else:
-                kwargs = dict(include_child=include_child, include_value=include_value)
 
-            if not isinstance(cur_k, slice):
-                sub_child = child.get(cur_k, create_child=False, **kwargs)
-                if sub_child is None:
-                    continue
-                pre_k = self._join_item_key(pre_k, cur_k)
-                if not is_final:
-                    child_q.append((pre_k, next_slice_list, sub_child))
-                else:
-                    yield pre_k, sub_child
+            if cur_k != slice:
+                joined_k = self._join_item_key(pre_k, cur_k)
+                cur_path = self._unsafe_key_path(joined_k)
+                if is_final:
+                    if self._internal_path_exists(cur_path, include_child, include_data):
+                        yield self._yield_item(joined_k, cur_path, yield_keys, yield_values)
+                elif os.path.isdir(cur_path):
+                    child_q.append((joined_k, next_slice_list))
             else:
-                children = child.items(**kwargs)
+                child = self.get_child(pre_k)
                 if not is_final:
-                    for sub_k, sub_sub_child in children:
-                        child_q.append((self._join_item_key(pre_k, sub_k), next_slice_list, sub_sub_child))
+                    for sub_k, _ in child._internal_keys(include_child=True, include_data=False):
+                        joined_k = self._join_item_key(pre_k, sub_k)
+                        child_q.append((joined_k, next_slice_list))
                 else:
-                    for sub_k, sub_sub_child in children:
-                        yield self._join_item_key(pre_k, sub_k), sub_sub_child
+                    for sub_k, _ in child._internal_keys(include_child=include_child, include_data=include_data):
+                        joined_k = self._join_item_key(pre_k, sub_k)
+                        cur_path = self._unsafe_key_path(joined_k)
+                        yield self._yield_item(joined_k, cur_path, yield_keys, yield_values)
 
-    def _internal_get_item(self, item):
-        if type(item) not in (list, tuple):
-            item = (item,)
-        if len(item) == 0:
-            return self
-        create_child = False
-        include_child = True
-        include_value = True
-        if item[-1] is Ellipsis:
-            item = item[:-1]
-            if len(item) == 0:
-                return self
-            create_child = True
-            include_value = False
-        if Ellipsis in item:
-            raise NDFSKeyError(self, item, NDFSKeyError.KeyErrorType.ELLIPSIS)
-        slice_idx = [i for i, k in enumerate(item) if isinstance(k, slice)]
-        if len(slice_idx) == 0:
-            return self._internal_get_cached(item, None, True, include_child, include_value, create_child)
-        else:
-            return self._slice_get(item, slice_idx, include_child, include_value)
+    ######################################################################################################
+    # Internal modifiers
+    ######################################################################################################
 
     def _internal_put(self, item, value, append=False):
         if not self.writable:
@@ -318,11 +437,9 @@ class NestedDictFS:
         if isinstance(value, self.__class__):
             raise ValueError(f"Cannot store a {self.__class__.__name__} object.")
 
-        self._internal_verify_item(item)
-
         item_path = self.key_path(item)
         if os.path.isdir(item_path):
-            raise NDFSLookupError(self, item, NDFSLookupError.LookupErrorType.SET_VALUE_OVER_CHILD)
+            raise NDFSLookupError(self, item, NDFSLookupError.Type.SET_DATA_OVER_CHILD)
 
         dir_path = os.path.dirname(item_path)
         os.makedirs(dir_path, exist_ok=True)
@@ -341,30 +458,28 @@ class NestedDictFS:
         elif os.path.isfile(cur_path):
             os.remove(cur_path)
         elif not ignore_errors:
-            raise NDFSKeyError(self, item, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+            raise NDFSKeyError(self, item, NDFSKeyError.Type.NO_SUCH_KEY)
 
     def _internal_copy_move(self, src, dst, move=True):
         if not self.writable:
             raise NDFSAccessViolation(self, dst)
 
-        self._internal_verify_item(src)
-        self._internal_verify_item(dst)
         src_path = self.key_path(src)
         dst_path = self.key_path(dst)
 
         if not os.path.exists(src_path):
-            raise NDFSKeyError(self, src, NDFSKeyError.KeyErrorType.NO_SUCH_KEY)
+            raise NDFSKeyError(self, src, NDFSKeyError.Type.NO_SUCH_KEY)
 
         copy_file = os.path.isfile(src_path)
         if copy_file:
             if os.path.isdir(dst_path):
-                raise NDFSLookupError(self, dst, NDFSLookupError.LookupErrorType.SET_VALUE_OVER_CHILD)
+                raise NDFSLookupError(self, dst, NDFSLookupError.Type.SET_DATA_OVER_CHILD)
         else:
             if os.path.isfile(dst_path):
-                raise NDFSLookupError(self, dst, NDFSLookupError.LookupErrorType.SET_CHILD_OVER_VALUE)
+                raise NDFSLookupError(self, dst, NDFSLookupError.Type.SET_CHILD_OVER_DATA)
             elif os.path.isdir(dst_path):
                 if len(os.listdir(dst_path)) > 0:
-                    raise NDFSLookupError(self, dst, NDFSLookupError.LookupErrorType.SET_CHILD_OVER_CHILD)
+                    raise NDFSLookupError(self, dst, NDFSLookupError.Type.SET_CHILD_OVER_CHILD)
                 else:
                     shutil.rmtree(dst_path)
 
@@ -377,16 +492,6 @@ class NestedDictFS:
         else:
             shutil.copytree(src_path, dst_path)
 
-    def _internal_list_dir(self):
-        if os.path.isdir(self.data_path):
-            return sorted(os.listdir(self.data_path))
-        else:
-            return []
-
-    def _internal_keys_paths(self):
-        for k in self._internal_list_dir():
-            yield k, self.key_path(k)
-
     ######################################################################################################
     # Explicit dict like interface
     ######################################################################################################
@@ -397,35 +502,59 @@ class NestedDictFS:
     def empty(self):
         return self.len() == 0
 
-    def keys(self, include_child=True, include_value=True):
-        for k, path in self._internal_keys_paths():
-            if (include_value and os.path.isfile(path)) or (include_child and os.path.isdir(path)):
-                yield k
+    @property
+    def keys(self):
+        return NestedDictIterator(self, include_child=True, include_data=True,
+                                  yield_keys=True, yield_values=False)
 
-    def value_keys(self):
-        yield from self.keys(include_child=False, include_value=True)
+    @property
+    def data_keys(self):
+        return NestedDictIterator(self, include_child=False, include_data=True,
+                                  yield_keys=True, yield_values=False)
 
+    @property
     def child_keys(self):
-        yield from self.keys(include_child=True, include_value=False)
+        return NestedDictIterator(self, include_child=True, include_data=False,
+                                  yield_keys=True, yield_values=False)
 
-    def items(self, include_child=True, include_value=True):
-        for k in self.keys(include_child, include_value):
-            yield k, self.get(k)
+    @property
+    def values(self):
+        return NestedDictIterator(self, include_child=True, include_data=True,
+                                  yield_keys=False, yield_values=True)
 
+    @property
+    def data_values(self):
+        return NestedDictIterator(self, include_child=False, include_data=True,
+                                  yield_keys=False, yield_values=True)
+
+    @property
+    def child_values(self):
+        return NestedDictIterator(self, include_child=True, include_data=False,
+                                  yield_keys=False, yield_values=True)
+
+    @property
+    def items(self):
+        return NestedDictIterator(self, include_child=True, include_data=True,
+                                  yield_keys=True, yield_values=True)
+
+    @property
     def child_items(self):
-        return self.items(include_child=True, include_value=False)
+        return NestedDictIterator(self, include_child=True, include_data=False,
+                                  yield_keys=True, yield_values=True)
 
-    def value_items(self):
-        return self.items(include_child=False, include_value=True)
+    @property
+    def data_items(self):
+        return NestedDictIterator(self, include_child=False, include_data=True,
+                                  yield_keys=True, yield_values=True)
 
-    def get(self, item, default_value=None, include_child=True, include_value=True, create_child=False):
-        return self._internal_get_cached(item, default_value, False, include_child, include_value, create_child)
+    def get(self, item, default_value=None, include_child=True, include_data=True, create_child=False):
+        return self.get_cached(item, default_value, False, include_child, include_data, create_child)
 
     def get_child(self, item):
-        return self._internal_get_cached(item, include_child=True, include_value=False, create_child=True)
+        return self.get_cached(item, include_child=True, include_data=False, create_child=True)
 
-    def get_value(self, item):
-        return self._internal_get_cached(item, include_child=False, include_value=True, create_child=False)
+    def get_data(self, item):
+        return self.get_cached(item, include_child=False, include_data=True, create_child=False)
 
     def put(self, item, value):
         return self._internal_put(item, value)
@@ -441,6 +570,20 @@ class NestedDictFS:
 
     def copy(self, src, dst):
         return self._internal_copy_move(src, dst, move=False)
+
+    def update(self, input_dict, max_depth=0):
+        if not isinstance(input_dict, dict):
+            raise ValueError("Input must be a dict.")
+
+        if max_depth < 1:
+            for k, v in input_dict.items():
+                self.put(k, v)
+        else:
+            for k, v in input_dict.items():
+                if isinstance(v, dict):
+                    self.get_child(k).update(v, max_depth-1)
+                else:
+                    self.put(k, v)
 
     def child_exists(self, item):
         cur_path = self.key_path(item)
@@ -463,7 +606,7 @@ class NestedDictFS:
     ######################################################################################################
 
     def __getitem__(self, item):
-        return self._internal_get_item(item)
+        return self.get_cached(item, None, True, include_child=True, include_data=True, create_child=False)
 
     def __setitem__(self, item, value):
         return self.put(item, value)
@@ -479,3 +622,28 @@ class NestedDictFS:
 
     def __len__(self):
         return self.len()
+
+
+class NestedDictIterator:
+    __slots__ = 'owner', 'include_child', 'include_data', 'yield_keys', 'yield_values'
+
+    def __init__(self, owner: NestedDictFS, include_child=True, include_data=True, yield_keys=True, yield_values=True):
+        self.owner = owner
+        self.include_child = include_child
+        self.include_data = include_data
+        self.yield_keys = yield_keys
+        self.yield_values = yield_values
+
+    def __getitem__(self, item):
+        return self.owner.search(item, self.include_child, self.include_data, self.yield_keys, self.yield_values)
+
+    def __call__(self, include_child=None, include_data=None):
+        if include_child is None:
+            include_child = self.include_child
+        if include_data is None:
+            include_data = self.include_data
+        yield from self.owner.search(slice(None), include_child, include_data, self.yield_keys, self.yield_values)
+
+    def __iter__(self):
+        yield from self.owner.search(slice(None), self.include_child, self.include_data,
+                                     self.yield_keys, self.yield_values)
