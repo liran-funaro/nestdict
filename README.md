@@ -83,7 +83,7 @@ For all of the query types above: `NestedDictFS.<query_type>()` is equivalent to
 ```python
 from nested_dict_fs import NestedDictFS
 k = NestedDictFS('/tmp/test', mode='c')
-for i in range(3):
+for i in range(1, 4):
     k['x', i] = i
     k['y', i] = i
 
@@ -101,6 +101,9 @@ print(list(k.child_keys['x', :]))
 
 print(list(k.child_values[:]))
 # [NestedDictFS('/tmp/test/x', 'c'), NestedDictFS('/tmp/test/y', 'c')]
+
+print(list(k.keys[:, 1]))
+# [('x', '1'), ('y', '1')]
 ```
 
 # Traversing Tree
