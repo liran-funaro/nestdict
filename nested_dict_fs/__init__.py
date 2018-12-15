@@ -100,8 +100,10 @@ class NestedDictFS:
         """
         :param data_path: The key value store data path. It is possible to start from sub folder of existing path.
             Might be a string represents the path or an existing NestedDictFS object.
-        :param mode: Should be 'r' for read only, 'w', 'rw' or 'wr' for writable,
-            and 'c' for allow creation of a new data path (lazy).
+        :param mode: Access permission:
+             - 'r': for read only
+             - 'w', 'rw' or 'wr': writable
+             - 'c' allow creation of a new data path (lazy).
         :param cache_size: Define the cache size to use. Defaults to 128.
         :param shared_cache: Can be used to pass a cache object from another instance to be shared (ignores cache_size).
         :param store_engine: The class does not infer the store engine from the data path, so it is
@@ -142,6 +144,7 @@ class NestedDictFS:
             raise ValueError(f"Data path {self.data_path} does not exist.")
 
     def set_mode(self, mode='r'):
+        """ Set the mode of the object: r,w,c """
         self.mode = mode
         self.writable = any(k in mode for k in 'wc')
 
@@ -161,7 +164,10 @@ class NestedDictFS:
         return self._unsafe_key_path(item)
 
     def path_key(self, path):
-        """ Returns the key of a data path """
+        """
+        Returns the key of a data path
+        :raises Value Error if the path is not a sub path of the current object.
+        """
         path = self._normalize_path(path)
         if path == self.data_path:
             return ()
