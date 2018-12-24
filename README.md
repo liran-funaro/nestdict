@@ -137,6 +137,15 @@ print(list(k.keys['x', ..., :]))
 # [('x', '1'), ('x', 'y', '1')]
 ```
 
+In addition, the usage of regular expression in queries is supported.
+Python's regular expression, created with `re.compile()`, can be used as a search term, in addition to the above. 
+
+```python
+import re
+print(list(k.keys[:, ..., re.compile('[0-2]')]))
+# [('x', '1'), ('x', '2'), ('x', 'y', '1'), ('x', 'y', '2'), ('y', '1'), ('y', '2')]
+``` 
+
 
 # Storage Engine
 NestedDictFS currently supports storing the data in the following formats via the `store_engine` init argument:
