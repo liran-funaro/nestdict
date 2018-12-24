@@ -26,10 +26,11 @@ from collections import deque
 from nesteddict import store_engines
 from nesteddict.errors import NDAccessViolation, NDKeyError, NDLookupError
 
-from typing import Union, Optional, Any
+from typing import Union, Optional, Any, Pattern
 
 ITEM_TYPING = Union[str, tuple, list]
-SEARCH_TYPING = Union[ITEM_TYPING, slice, Ellipsis.__class__]
+SEARCH_TYPES = slice, Ellipsis.__class__, Pattern
+SEARCH_TYPING = Union[ITEM_TYPING, Union[SEARCH_TYPES]]
 
 
 class NestedDictFS:
@@ -182,19 +183,21 @@ class NestedDictFS:
         mode = self.mode if not create else 'c'
         return self.__class__(item_path, mode=mode, shared_cache=self.cache, store_engine=self.store_engine)
 
+    @staticmethod
+    def _is_search_type(k):
+        return any(isinstance(k, t) for t in SEARCH_TYPES)
+
     def _internal_verify_item(self, item: ITEM_TYPING, is_search_key: bool = False):
         if type(item) not in (list, tuple):
             item = (item,)
-        if not is_search_key:
-            if Ellipsis in item:
-                raise NDKeyError(self, NDKeyError.Type.ELLIPSIS, item)
-            if any(isinstance(k, slice) for k in item):
-                raise NDKeyError(self, NDKeyError.Type.SLICE, item)
 
-        item = tuple([str(k) if not type(k) in (slice, Ellipsis.__class__) else k for k in item])
+        item = tuple([str(k) if not self._is_search_type(k) else k for k in item])
         for k in item:
-            if type(k) in (slice, Ellipsis.__class__):
-                continue
+            if self._is_search_type(k):
+                if is_search_key:
+                    continue
+                else:
+                    raise NDKeyError(self, NDKeyError.Type.NO_SEARCH_TERM, item)
             if k in ('.', '..') or os.path.sep in k:
                 raise NDKeyError(self, NDKeyError.Type.INVALID_KEY, item)
 
@@ -295,22 +298,6 @@ class NestedDictFS:
                 ret.append(item)
         return tuple(ret)
 
-    @staticmethod
-    def _split_list_by_type(lst: Union[list, tuple], *split_types: Any):
-        items_type = ((i, k, type(k)) for i, k in enumerate(lst))
-        type_idx = [(i, k, t) for i, k, t in items_type if t in split_types]
-
-        ret_lst = []
-        prev_idx = 0
-        for i, k, t in type_idx:
-            ret_lst.append(lst[prev_idx:i])
-            ret_lst.append(t)
-            prev_idx = i + 1
-        if prev_idx < len(lst):
-            ret_lst.append(lst[prev_idx:])
-
-        return ret_lst
-
     def _yield_item(self, item: ITEM_TYPING, item_path: str, yield_keys: bool = True, yield_values: bool = True):
         if len(item) == 1:
             item = item[0]
@@ -345,6 +332,22 @@ class NestedDictFS:
         for item, item_path in self._internal_walk(include_child, include_data, topdown):
             yield self._yield_item(item, item_path, yield_keys, yield_values)
 
+    @classmethod
+    def _split_list_by_search_type(cls, lst: Union[list, tuple]):
+        type_idx = [(i, k) for i, k in enumerate(lst) if cls._is_search_type(k)]
+
+        ret_lst = []
+        prev_idx = 0
+        for i, k in type_idx:
+            if i != prev_idx:
+                ret_lst.append(lst[prev_idx:i])
+            ret_lst.append(k)
+            prev_idx = i + 1
+        if prev_idx < len(lst):
+            ret_lst.append(lst[prev_idx:])
+
+        return ret_lst
+
     def search(self, item: SEARCH_TYPING, include_child: bool = True, include_data: bool = True,
                yield_keys: bool = True, yield_values: bool = True):
         """ Search the current sub tree """
@@ -358,7 +361,7 @@ class NestedDictFS:
             yield self._yield_item((), self.data_path, **yield_kwargs)
             return
 
-        init_slice_list = self._split_list_by_type(item, slice, Ellipsis.__class__)
+        init_slice_list = self._split_list_by_search_type(item)
 
         q = deque()
         q.append(((), init_slice_list))
@@ -369,10 +372,13 @@ class NestedDictFS:
             search_kwargs = final_kwargs if is_final else child_kwargs
 
             sub_items = ()
-            if cur_k == Ellipsis.__class__:
+            if isinstance(cur_k, Ellipsis.__class__):
                 sub_items = child._internal_walk(**search_kwargs)
-            elif cur_k == slice:
+            elif isinstance(cur_k, slice):
                 sub_items = child._internal_keys(**search_kwargs)
+            elif isinstance(cur_k, Pattern):
+                sub_items = ((sub_k, cur_path) for sub_k, cur_path in child._internal_keys(**search_kwargs) if
+                             cur_k.match(sub_k))
             else:
                 cur_path = child._unsafe_key_path(cur_k)
                 if self._internal_path_exists(cur_path, **search_kwargs):

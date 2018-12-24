@@ -65,8 +65,7 @@ class NDKeyError(NDException):
     class Type(Enum):
         NO_SUCH_KEY = auto()
         INVALID_KEY = auto()
-        ELLIPSIS = auto()
-        SLICE = auto()
+        NO_SEARCH_TERM = auto()
 
     def __init__(self, obj, error: Type, item):
         msg = f"Key error in {obj} with item {item}."
@@ -74,10 +73,8 @@ class NDKeyError(NDException):
             msg = f"Item {item} does not exist in {obj}."
         elif error == self.Type.INVALID_KEY:
             msg = f"Invalid key: {item}."
-        elif error == self.Type.ELLIPSIS:
-            msg = "Ellipsis (...) may not be used as a key."
-        elif error == self.Type.SLICE:
-            msg = "Slice (:) may not be used as a key."
+        elif error == self.Type.NO_SEARCH_TERM:
+            msg = "Only search terms may use ellipsis (...), slice (:) or a pattern (regular-expression)."
 
         super().__init__(obj, item, msg)
         self.error = error

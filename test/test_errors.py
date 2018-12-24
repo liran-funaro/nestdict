@@ -108,29 +108,27 @@ class TestNestedDictFSErrors(unittest.TestCase):
         with self.assertRaises(TypeError):
             _ = NestedDictFS(None, mode='c')
 
-    def test_ellipsis(self):
+    def test_search_term_without_search(self):
         k = NestedDictFS(self.path, mode='c')
         with self.assertRaises(NDKeyError) as av:
             _ = k['a', ..., 'b']
-        self.assertEqual(av.exception.error, NDKeyError.Type.ELLIPSIS)
+        self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
         with self.assertRaises(NDKeyError) as av:
             _ = k['a', ...]
-        self.assertEqual(av.exception.error, NDKeyError.Type.ELLIPSIS)
+        self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
         with self.assertRaises(NDKeyError) as av:
             _ = k[...]
-        self.assertEqual(av.exception.error, NDKeyError.Type.ELLIPSIS)
+        self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
 
-    def test_slice(self):
-        k = NestedDictFS(self.path, mode='c')
         with self.assertRaises(NDKeyError) as av:
             _ = k['a', :, 'b']
-        self.assertEqual(av.exception.error, NDKeyError.Type.SLICE)
+        self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
         with self.assertRaises(NDKeyError) as av:
             _ = k['a', :]
-        self.assertEqual(av.exception.error, NDKeyError.Type.SLICE)
+        self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
         with self.assertRaises(NDKeyError) as av:
             _ = k[:]
-        self.assertEqual(av.exception.error, NDKeyError.Type.SLICE)
+        self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
 
     def test_store_child(self):
         k = NestedDictFS(self.path, mode='c')

@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from test import *
 import unittest
 import itertools
+import re
 
 
 class FakeQuery:
@@ -130,6 +131,10 @@ class TestNestedDictFSSearch(unittest.TestCase):
     def test_sandwich(self):
         self._generic_query(fq[:, '1', :],
                             *itertools.product(('a', 'b', 'c'), ('1',), ('X', 'Y', 'Z')))
+
+    def test_regexp(self):
+        self._generic_query(fq[re.compile(r'[ab]'), '1', :],
+                            *itertools.product(('a', 'b'), ('1',), ('X', 'Y', 'Z')))
 
     def test_asymmetric(self):
         val = 'asymmetric'
