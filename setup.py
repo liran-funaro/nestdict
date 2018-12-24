@@ -19,9 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from setuptools import setup
 
 setup(
-    name="nested-dict-fs",
+    name="nesteddict",
     version="0.1.0",
-    packages=['nested_dict_fs'],
+    packages=['nesteddict'],
     description="Permanent hierarchical storage using file-system directories with dict-like API",
     author="Liran Funaro",
     author_email="fonaro+nested_dict_fs@gmail.com",

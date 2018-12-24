@@ -19,21 +19,30 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import sys
 import pkgutil
 import importlib
+import warnings
 
+from typing import Union
 
 DEFAULT_STORE_ENGINE = 'msgpack-numpy'
-ENGINES = list([modname for _, modname, _ in pkgutil.iter_modules(sys.modules[__name__].__path__)])
+ENGINES = set([modname for _, modname, _ in pkgutil.iter_modules(sys.modules[__name__].__path__)])
+
+STORE_TYPING = Union[str, list, tuple, None]
 
 
-def get_store_engine(method):
+def get_store_engine(method: STORE_TYPING = None):
+    if method is None:
+        method = DEFAULT_STORE_ENGINE
     if type(method) in (list, tuple) and len(method) == 2:
         return method
     elif not isinstance(method, str):
-        raise TypeError(f"Store engine must be a string or a tuple of (write, read) methods. Not {type(method)}.")
+        raise TypeError(f"Store engine must be a string or a tuple of (write, read) methods. Not {method}. "
+                        f"Choose one of the followings: {ENGINES}.")
 
     if method not in ENGINES:
-        raise ValueError(f"No such storage engine: {method}")
+        raise ValueError(f"No such storage engine: {method}. Choose one of the followings: {ENGINES}.")
 
-    eng = importlib.import_module(f'.{method}', __name__)
-    return eng.write, eng.read
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', category=ImportWarning)
+        engine_module = importlib.import_module(f'.{method}', __name__)
+    return engine_module.write, engine_module.read
 

@@ -1,6 +1,6 @@
-# nested_dict_fs
+# nesteddict
 
-Permanent Nested Dict via File System's Folders
+Permanent nested dict via file system's folders.
 
 This package allows storing permanent data on the drive via a hierarchical/nested dict-like API.
 The data will be stored as nested directories structure over the file system.
@@ -28,7 +28,7 @@ child items and data items respectively.
 `get_child()` will create a child (lazy) if it does not exit.
 
 ```python
-from nested_dict_fs import NestedDictFS
+from nesteddict import NestedDictFS
 
 # Creating nested dict obj. mode='c' will create the folder (lazy) if it doesn't exist.
 k = NestedDictFS('/tmp/test', mode='c')
@@ -68,8 +68,31 @@ print(k['z'])
 # ['abc', 'efg']
 ```
 
+# Traversing Tree
+NestedDictFS supports traversing an entire tree.
+
+```python
+from nesteddict import NestedDictFS
+k = NestedDictFS('/tmp/test', mode='c')
+for i in range(3):
+    k['x', i] = i
+    k['y', i] = i
+
+print(list(k.walk(yield_keys=True, yield_values=False)))
+# [(), 'y', 'x', ('y', '1'), ('y', '2'), ('y', '0'), ('x', '1'), ('x', '2'), ('x', '0')]
+
+print(list(k.walk(yield_keys=False, yield_values=True)))
+# [NestedDictFS(/tmp/test, c), NestedDictFS(/tmp/test/y, c), NestedDictFS(/tmp/test/x, c), 1, 2, 0, 1, 2, 0]
+
+print(list(k.walk(include_child=False, include_data=True, yield_keys=True, yield_values=True)))
+# [(('y', '1'), 1), (('y', '2'), 2), (('y', '0'), 0), (('x', '1'), 1), (('x', '2'), 2), (('x', '0'), 0)]
+```
+
+
 # Search
-NestedDictFS supports search query.
+NestedDictFS supports search query using slice (`:`) and ellipsis (`...`).
+Slice includes all the child keys and ellipsis includes all the sub-tree.
+
 The following search type are supported:
 - `NestedDictFS.items[query]`: iterate over key/value pairs that their key matches the query.
 - `NestedDictFS.keys[query]`: iterate over keys that match the query.
@@ -78,52 +101,40 @@ The following search type are supported:
 In addition, using the prefix `child_` (e.g., `NestedDictFS.child_keys`) will only yield child items,
 and using the prefix `data_` will only yield data items. 
 
-For all of the query types above: `NestedDictFS.<query_type>()` is equivalent to `NestedDictFS.<query_type>[:]`
+For all of the query types above: `NestedDictFS.<query_type>()` is equivalent to `NestedDictFS.<query_type>[:]`.
+Similarly, `NestedDictFS.walk()` is equivalent to `NestedDictFS.items[...]`.
 
 ```python
-from nested_dict_fs import NestedDictFS
+from nesteddict import NestedDictFS
 k = NestedDictFS('/tmp/test', mode='c')
 for i in range(1, 4):
     k['x', i] = i
     k['y', i] = i
+    k['x', 'y', i] = i
 
 print(list(k.keys['x', :]))
-# [('x', '1'), ('x', '2'), ('x', '3')]
+# [('x', '1'), ('x', '2'), ('x', '3'), ('x', 'y')]
 
 print(list(k.items['x', :]))
-# [(('x', '1'), 1), (('x', '2'), 2), (('x', '3'), 3)]
+# [(('x', '1'), 1), (('x', '2'), 2), (('x', '3'), 3), (('x', 'y'), NestedDictFS(/tmp/test/x/y, c))]
 
 print(list(k.data_keys['x', :]))
 # [('x', '1'), ('x', '2'), ('x', '3')]
 
 print(list(k.child_keys['x', :]))
-# []
+# [('x', 'y')]
 
 print(list(k.child_values[:]))
-# [NestedDictFS('/tmp/test/x', 'c'), NestedDictFS('/tmp/test/y', 'c')]
+# [NestedDictFS(/tmp/test/x, c), NestedDictFS(/tmp/test/y, c)]
 
 print(list(k.keys[:, 1]))
 # [('x', '1'), ('y', '1')]
-```
 
-# Traversing Tree
-NestedDictFS supports traversing an entire tree.
+print(list(k.keys[..., 'y']))
+# [('y', '1'), ('y', '2'), ('y', '3'), ('x', 'y', '1'), ('x', 'y', '2'), ('x', 'y', '3')]
 
-```python
-from nested_dict_fs import NestedDictFS
-k = NestedDictFS('/tmp/test', mode='c')
-for i in range(3):
-    k['x', i] = i
-    k['y', i] = i
-
-print(list(k.walk(yield_keys=True, yield_values=False)))
-# ['x', ('x', '1'), ('x', '2'), ('x', '3'), 'y', ('y', '1'), ('y', '2'), ('y', '3')]
-
-print(list(k.walk(yield_keys=False, yield_values=False)))
-# [NestedDictFS('/tmp/test/x', 'c'), 1, 2, 3, NestedDictFS('/tmp/test/y', 'c'), 1, 2, 3]
-
-print(list(k.walk(include_child=False, include_data=True, yield_keys=True, yield_values=True)))
-# [(('x', '1'), 1), (('x', '2'), 2), (('x', '3'), 3), (('y', '1'), 1), (('y', '2'), 2), (('y', '3'), 3)]
+print(list(k.keys['x', ..., :]))
+# [('x', '1'), ('x', 'y', '1')]
 ```
 
 
@@ -139,7 +150,7 @@ NestedDictFS optionally uses `gzip` to compress the stored data.
 The init argument `compress_level` can be set from 0 to 9 (see `gzip` documentation).
 
 ```python
-from nested_dict_fs import NestedDictFS
+from nesteddict import NestedDictFS
 k = NestedDictFS('/tmp/test-msgpack', mode='c', store_engine='msgpack')
 k['a'] = {'b': 1}
 

@@ -140,7 +140,8 @@ class TestNestedDictFSSearch(unittest.TestCase):
 
     def test_walk(self):
         ret = list(self.k.walk(yield_values=False))
-        expected_keys = get_keys('a', 'b', 'c', 'v')
+        expected_keys = get_keys(())
+        expected_keys.extend(get_keys('a', 'b', 'c', 'v'))
         expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3', 'v'))))
         expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3'), ('X', 'Y', 'Z'))))
         self.assertCountEqual(ret, expected_keys)
@@ -152,7 +153,19 @@ class TestNestedDictFSSearch(unittest.TestCase):
         self.assertCountEqual(ret, expected_keys)
 
         ret = list(self.k.walk(yield_values=False, include_data=False))
-        expected_keys = get_keys('a', 'b', 'c')
+        expected_keys = get_keys(())
+        expected_keys.extend(get_keys('a', 'b', 'c'))
         expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('1', '2', '3'))))
         self.assertCountEqual(ret, expected_keys)
 
+    def test_slice_and_walk(self):
+        ret = get_ret_list(self.k.keys[..., 'v'])
+        expected_keys = get_keys('v')
+        expected_keys.extend(get_keys(*itertools.product(('a', 'b', 'c'), ('v',))))
+        self.assertCountEqual(ret, expected_keys)
+
+    def test_empty_search(self):
+        k = NestedDictFS(self.path, mode='c')
+        ret = get_ret_list(k.search((), yield_keys=True, yield_values=False))
+        expected_keys = get_keys(())
+        self.assertCountEqual(ret, expected_keys)

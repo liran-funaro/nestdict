@@ -21,7 +21,7 @@ import uuid
 import shutil
 import tempfile
 
-from nested_dict_fs import NestedDictFS, NDFSKeyError, NDFSLookupError, NDFSAccessViolation
+from nesteddict import NestedDictFS, NDKeyError, NDLookupError, NDAccessViolation
 
 
 def random_folder():
