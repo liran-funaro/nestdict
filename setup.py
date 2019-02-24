@@ -1,5 +1,5 @@
 """
-Author: Liran Funaro <funaro@cs.technion.ac.il>
+Author: Liran Funaro <liran.funaro@gmail.com>
 
 Copyright (C) 2006-2018 Liran Funaro
 
@@ -24,10 +24,10 @@ setup(
     packages=['nesteddict'],
     description="Permanent hierarchical storage using file-system directories with dict-like API",
     author="Liran Funaro",
-    author_email="fonaro+nested_dict_fs@gmail.com",
+    author_email="liran.funaro+nesteddict@gmail.com",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url="https://github.com/fonaro/nested-dict-fs",
+    url="https://bitbucket.org/funaro/nesteddict",
     keywords='key-value-store dict file-system',
     classifiers=[
         "Programming Language :: Python :: 2",
