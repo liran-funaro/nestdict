@@ -27,7 +27,7 @@ setup(
     author_email="liran.funaro+nesteddict@gmail.com",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url="https://bitbucket.org/funaro/nesteddict",
+    url="https://github.com/liran-funaro/nestdict",
     keywords='key-value-store dict file-system',
     classifiers=[
         "Programming Language :: Python :: 2",
