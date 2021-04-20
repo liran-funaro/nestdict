@@ -20,7 +20,7 @@ from test import *
 import unittest
 
 
-class TestNestedDictFSErrors(unittest.TestCase):
+class TestDictFSErrors(unittest.TestCase):
     def setUp(self):
         self.path = setup_test()
 

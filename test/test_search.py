@@ -30,7 +30,7 @@ class FakeQuery:
 fq = FakeQuery()
 
 
-class TestNestedDictFSSearch(unittest.TestCase):
+class TestDictFSSearch(unittest.TestCase):
     def setUp(self):
         self.path = setup_test()
 

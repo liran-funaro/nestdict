@@ -42,7 +42,7 @@ class DictFS:
                  store_engine: store_engines.STORE_TYPING = None, compress_level: int = 9):
         """
         :param data_path: The key value store data path. It is possible to start from sub folder of existing path.
-            Might be a string represents the path or an existing NestedDictFS object.
+            Might be a string represents the path or an existing DictFS object.
         :param mode: Access permission:
              - 'r': for read only
              - 'w', 'rw' or 'wr': writable

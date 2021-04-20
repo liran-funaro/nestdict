@@ -20,7 +20,7 @@ from test import *
 import unittest
 
 
-class TestNestedDictFS(unittest.TestCase):
+class TestDictFS(unittest.TestCase):
     def setUp(self):
         self.path = setup_test()
         self.k = DictFS(self.path, mode='c')

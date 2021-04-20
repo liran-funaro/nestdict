@@ -21,7 +21,7 @@ import unittest
 import numpy as np
 
 
-class TestNestedDictFSEngine(unittest.TestCase):
+class TestDictFSEngine(unittest.TestCase):
     def setUp(self):
         self.path = setup_test()
 
