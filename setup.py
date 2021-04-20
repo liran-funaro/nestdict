@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,15 +19,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from setuptools import setup
 
 setup(
-    name="nesteddict",
+    name="dictfs",
     version="0.1.0",
-    packages=['nesteddict'],
+    packages=['dictfs'],
     description="Permanent hierarchical storage using file-system directories with dict-like API",
     author="Liran Funaro",
-    author_email="liran.funaro+nesteddict@gmail.com",
+    author_email="liran.funaro+dictfs@gmail.com",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url="https://github.com/liran-funaro/nestdict",
+    url="https://github.com/liran-funaro/dictfs",
     keywords='key-value-store dict file-system',
     classifiers=[
         "Programming Language :: Python :: 2",

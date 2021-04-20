@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,11 +16,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import pickle
 
 
 def write(f, obj):
-    f.write(obj)
+    pickle.dump(obj, f)
 
 
 def read(f):
-    return f.read()
+    return pickle.load(f)

@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,16 +16,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import msgpack
 
 
 def write(f, obj):
-    msgpack.pack(obj, f, use_bin_type=True)
+    f.write(obj)
 
 
 def read(f):
-    try:
-        return msgpack.unpack(f, raw=False)
-    except msgpack.exceptions.ExtraData:
-        f.seek(0)
-        return list(msgpack.Unpacker(f, raw=False))
+    return f.read()

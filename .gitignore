@@ -15,6 +15,7 @@ docs/locale/
 node_modules/
 tests/coverage_html/
 tests/.coverage
+venv/
 
 *.orig
 *.vtg

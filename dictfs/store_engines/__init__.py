@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -45,4 +45,3 @@ def get_store_engine(method: STORE_TYPING = None):
         warnings.simplefilter('ignore', category=ImportWarning)
         engine_module = importlib.import_module(f'.{method}', __name__)
     return engine_module.write, engine_module.read
-

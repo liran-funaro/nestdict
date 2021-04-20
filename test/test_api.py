@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,45 +23,45 @@ import unittest
 class TestNestedDictFS(unittest.TestCase):
     def setUp(self):
         self.path = setup_test()
-        self.k = NestedDictFS(self.path, mode='c')
+        self.k = DictFS(self.path, mode='c')
 
     def tearDown(self):
         clean(self.path)
 
     def test_self_init(self):
-        k = NestedDictFS(self.path, mode='c', store_engine='msgpack', compress_level=0)
+        k = DictFS(self.path, mode='c', store_engine='msgpack', compress_level=0)
         k['a'] = 1
-        new_k = NestedDictFS(k, mode='r')
+        new_k = DictFS(k, mode='r')
         self.assertEqual(k.data_path, new_k.data_path)
         self.assertEqual(k.cache, new_k.cache)
         self.assertEqual(k.compress_level, new_k.compress_level)
         self.assertEqual(new_k['a'], 1)
 
     def test_repr(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         str_k = repr(k)
-        self.assertIn(NestedDictFS.__name__, str_k)
+        self.assertIn(DictFS.__name__, str_k)
         self.assertIn(self.path, str_k)
 
     def test_get_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         c = k.get_child('a')
         self.assertEqual(k.key_path('a'), c.data_path)
 
     def test_get_data(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
         c = k.get_data('a')
         self.assertEqual(c, 1)
 
     def test_get_default_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         c = k.get('a')
         self.assertEqual(c, None)
 
     def test_deleted_cached(self):
-        k1 = NestedDictFS(self.path, mode='c')
-        k2 = NestedDictFS(self.path, mode='c')
+        k1 = DictFS(self.path, mode='c')
+        k2 = DictFS(self.path, mode='c')
         k1['a'] = 1
         _ = k2['a']
         del k1['a']
@@ -69,11 +69,11 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertEqual(c, None)
 
     def test_get_self(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         self.assertEqual(k, k[()])
 
     def test_delete(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
 
         k['a'] = 1
         k['b', 'c'] = 2
@@ -87,7 +87,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertEqual(k.get(('b', 'c')), None)
 
     def test_keys(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['abc'] = 1
         k['def', 'ghi'] = 3
 
@@ -112,7 +112,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertCountEqual(iter_keys, ['abc', 'def'])
 
     def test_values(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
         k['b', 'c'] = 3
 
@@ -135,7 +135,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertCountEqual(values, expected_values)
 
     def test_items(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
         k['b', 'c'] = 3
 
@@ -158,7 +158,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertCountEqual(expected_child_items, child_items)
 
     def test_append(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
 
         k['a'] = 1
         self.assertEqual(k['a'], 1)
@@ -169,7 +169,7 @@ class TestNestedDictFS(unittest.TestCase):
         k.append('a', 3)
         self.assertListEqual(k['a'], [1, 2, 3])
 
-        k = NestedDictFS(self.path, mode='c', store_engine='msgpack')
+        k = DictFS(self.path, mode='c', store_engine='msgpack')
 
         k['a'] = 1
         self.assertEqual(k['a'], 1)
@@ -181,7 +181,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertListEqual(k['a'], [1, 2, 3])
 
     def test_exists(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
         k['b', 'c'] = 2
         self.assertTrue(k.exists('a'))
@@ -195,8 +195,8 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertTrue(k.child_exists('b'))
 
     def test_update_cache(self):
-        k1 = NestedDictFS(self.path, mode='c')
-        k2 = NestedDictFS(self.path, mode='c')
+        k1 = DictFS(self.path, mode='c')
+        k2 = DictFS(self.path, mode='c')
         p = k2.key_path('a')
 
         k1['a'] = {'a': 1}
@@ -208,7 +208,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertEqual(k2['a'], 2)
 
     def test_clear_cache(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
         _ = k['a']
         self.assertGreaterEqual(len(k.cache), 1)
@@ -216,7 +216,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertEqual(len(k.cache), 0)
 
     def test_move_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 'b'] = 1
         k.move(('a', 'b'), 'd')
         self.assertEqual(k['d'], 1)
@@ -224,14 +224,14 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertFalse(k.exists(('a', 'b')))
 
     def test_copy_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 'b'] = 1
         k.copy(('a', 'b'), 'd')
         self.assertEqual(k['d'], 1)
         self.assertTrue(k.exists(('a', 'b')))
 
     def test_move_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 1] = 1
         k['a', 2] = 2
         k['a', 'c', 3] = 3
@@ -242,7 +242,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertFalse(k.exists('a'))
 
     def test_copy_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 1] = 1
         k['a', 2] = 2
         k['a', 'c', 3] = 3
@@ -256,7 +256,7 @@ class TestNestedDictFS(unittest.TestCase):
         self.assertEqual(k['a', 'c', 3], 3)
 
     def test_len(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         expected_len = 5
         for i in range(expected_len):
             k[i] = i

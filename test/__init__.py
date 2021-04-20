@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ import uuid
 import shutil
 import tempfile
 
-from nesteddict import NestedDictFS, NDKeyError, NDLookupError, NDAccessViolation
+from dictfs import DictFS, NDKeyError, NDLookupError, NDAccessViolation
 
 
 def random_folder():
@@ -44,7 +44,7 @@ def setup_test():
 def get_ret_list(ret_obj):
     ret = []
     for kv in ret_obj:
-        if isinstance(kv, NestedDictFS):
+        if isinstance(kv, DictFS):
             kv = kv.data_path
         ret.append(kv)
     return ret
@@ -53,7 +53,7 @@ def get_ret_list(ret_obj):
 def get_ret_list_items(ret_obj):
     ret = []
     for k, v in ret_obj:
-        if isinstance(v, NestedDictFS):
+        if isinstance(v, DictFS):
             v = v.data_path
         ret.append((k, v))
     return ret

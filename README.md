@@ -28,17 +28,17 @@ child items and data items respectively.
 `get_child()` will create a child (lazy) if it does not exit.
 
 ```python
-from nesteddict import NestedDictFS
+from dictfs import DictFS
 
 # Creating nested dict obj. mode='c' will create the folder (lazy) if it doesn't exist.
-k = NestedDictFS('/tmp/test', mode='c')
+k = DictFS('/tmp/test', mode='c')
 for i in range(3):
     k['x', i] = i
     k['y', i] = i
 
 print(list(k.keys()))
 # ['x', 'y']
- 
+
 print(list(k['x'].items()))
 # [('1', 1), ('2', 2), ('3', 3)]
 
@@ -72,8 +72,9 @@ print(k['z'])
 NestedDictFS supports traversing an entire tree.
 
 ```python
-from nesteddict import NestedDictFS
-k = NestedDictFS('/tmp/test', mode='c')
+from dictfs import DictFS
+
+k = DictFS('/tmp/test', mode='c')
 for i in range(3):
     k['x', i] = i
     k['y', i] = i
@@ -105,8 +106,9 @@ For all of the query types above: `NestedDictFS.<query_type>()` is equivalent to
 Similarly, `NestedDictFS.walk()` is equivalent to `NestedDictFS.items[...]`.
 
 ```python
-from nesteddict import NestedDictFS
-k = NestedDictFS('/tmp/test', mode='c')
+from dictfs import DictFS
+
+k = DictFS('/tmp/test', mode='c')
 for i in range(1, 4):
     k['x', i] = i
     k['y', i] = i
@@ -159,8 +161,9 @@ NestedDictFS optionally uses `gzip` to compress the stored data.
 The init argument `compress_level` can be set from 0 to 9 (see `gzip` documentation).
 
 ```python
-from nesteddict import NestedDictFS
-k = NestedDictFS('/tmp/test-msgpack', mode='c', store_engine='msgpack')
+from dictfs import DictFS
+
+k = DictFS('/tmp/test-msgpack', mode='c', store_engine='msgpack')
 k['a'] = {'b': 1}
 
 print(k['a'])
@@ -170,9 +173,10 @@ k.append('a', 5)
 print(k['a'])
 # [{'b': 1}, 5]
 
-k = NestedDictFS('/tmp/test-numpy', mode='c', store_engine='msgpack-numpy')
+k = DictFS('/tmp/test-numpy', mode='c', store_engine='msgpack-numpy')
 import numpy as np
-k['a'] = np.array([1,2,3], dtype=np.uint32)
+
+k['a'] = np.array([1, 2, 3], dtype=np.uint32)
 
 print(k['a'])
 # array([1, 2, 3], dtype=uint32)
@@ -181,7 +185,7 @@ k.append('a', 5)
 print(k['a'])
 # [array([1, 2, 3], dtype=uint32), 5]
 
-k = NestedDictFS('/tmp/test-plain', mode='c', store_engine='plain', compress_level=0)
+k = DictFS('/tmp/test-plain', mode='c', store_engine='plain', compress_level=0)
 k['a'] = {'b': 1}
 
 print(k['a'])

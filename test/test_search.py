@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -42,10 +42,10 @@ class TestNestedDictFSSearch(unittest.TestCase):
                     d.setdefault(i1, {}).setdefault(i2, {})[i3] = f"Value={(i1, i2, i3)}"
         self.d = d
 
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k.update(d, 10)
 
-        self.k = NestedDictFS(self.path, mode='c')
+        self.k = DictFS(self.path, mode='c')
         self.maxDiff = None
 
     def tearDown(self):
@@ -170,7 +170,7 @@ class TestNestedDictFSSearch(unittest.TestCase):
         self.assertCountEqual(ret, expected_keys)
 
     def test_empty_search(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         ret = get_ret_list(k.search((), yield_keys=True, yield_values=False))
         expected_keys = get_keys(())
         self.assertCountEqual(ret, expected_keys)

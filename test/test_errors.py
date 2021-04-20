@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,17 +32,17 @@ class TestNestedDictFSErrors(unittest.TestCase):
             f.write('test')
 
         with self.assertRaises(ValueError):
-            _ = NestedDictFS(self.path, mode='c')
+            _ = DictFS(self.path, mode='c')
 
     def test_not_exist(self):
         with self.assertRaises(ValueError):
-            _ = NestedDictFS(self.path, mode='r')
+            _ = DictFS(self.path, mode='r')
 
         with self.assertRaises(ValueError):
-            _ = NestedDictFS(self.path, mode='w')
+            _ = DictFS(self.path, mode='w')
 
     def test_read_only(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['b'] = 2
         k.set_mode('r')
 
@@ -62,7 +62,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
             _ = k.move('b', 'c')
 
     def test_not_include_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
 
         with self.assertRaises(NDLookupError) as av:
@@ -78,7 +78,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDLookupError.Type.NOT_INCLUDE_DATA)
 
     def test_not_include_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 'b'] = 1
 
         with self.assertRaises(NDLookupError) as av:
@@ -94,7 +94,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDLookupError.Type.NOT_INCLUDE_CHILD)
 
     def test_no_suck_key(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
 
         with self.assertRaises(NDKeyError) as av:
             _ = k['a']
@@ -106,10 +106,10 @@ class TestNestedDictFSErrors(unittest.TestCase):
 
     def test_bad_path(self):
         with self.assertRaises(TypeError):
-            _ = NestedDictFS(None, mode='c')
+            _ = DictFS(None, mode='c')
 
     def test_search_term_without_search(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         with self.assertRaises(NDKeyError) as av:
             _ = k['a', ..., 'b']
         self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
@@ -131,20 +131,20 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDKeyError.Type.NO_SEARCH_TERM)
 
     def test_store_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         a = k.get_child('a')
         with self.assertRaises(ValueError):
             k['b'] = a
 
     def test_store_value_over_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 'b'] = 1
         with self.assertRaises(NDLookupError) as av:
             k['a'] = 1
         self.assertEqual(av.exception.error, NDLookupError.Type.SET_DATA_OVER_CHILD)
 
     def test_store_child_over_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a'] = 1
         with self.assertRaises(NDLookupError) as av:
             k['a', 'b'] = 1
@@ -156,13 +156,13 @@ class TestNestedDictFSErrors(unittest.TestCase):
 
     def test_invalid_engine(self):
         with self.assertRaises(ValueError):
-            _ = NestedDictFS(self.path, mode='c', store_engine='invalid')
+            _ = DictFS(self.path, mode='c', store_engine='invalid')
 
         with self.assertRaises(TypeError):
-            _ = NestedDictFS(self.path, mode='c', store_engine={})
+            _ = DictFS(self.path, mode='c', store_engine={})
 
     def test_move_value_over_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 'x'] = 1
         k['b', 'y'] = 2
         with self.assertRaises(NDLookupError) as av:
@@ -170,7 +170,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDLookupError.Type.SET_DATA_OVER_CHILD)
 
     def test_copy_value_over_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 'x'] = 1
         k['b', 'y'] = 2
         with self.assertRaises(NDLookupError) as av:
@@ -178,7 +178,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDLookupError.Type.SET_DATA_OVER_CHILD)
 
     def test_move_child_over_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 1] = 1
         k['a', 2] = 2
         k['a', 'x', 3] = 3
@@ -188,7 +188,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDLookupError.Type.SET_CHILD_OVER_DATA)
 
     def test_copy_child_over_value(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 1] = 1
         k['a', 2] = 2
         k['a', 'x', 3] = 3
@@ -198,7 +198,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(av.exception.error, NDLookupError.Type.SET_CHILD_OVER_DATA)
 
     def test_move_child_over_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 1] = 1
         k['a', 2] = 2
         k['a', 'x', 3] = 3
@@ -213,7 +213,7 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(k['b', 'x', 3], 3)
 
     def test_copy_child_over_child(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         k['a', 1] = 1
         k['a', 2] = 2
         k['a', 'x', 3] = 3
@@ -228,19 +228,19 @@ class TestNestedDictFSErrors(unittest.TestCase):
         self.assertEqual(k['b', 'x', 3], 3)
 
     def test_copy_non_exist(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         with self.assertRaises(NDKeyError) as av:
             k.copy('a', 'b')
         self.assertEqual(av.exception.error, NDKeyError.Type.NO_SUCH_KEY)
 
     def test_move_non_exist(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         with self.assertRaises(NDKeyError) as av:
             k.move('a', 'b')
         self.assertEqual(av.exception.error, NDKeyError.Type.NO_SUCH_KEY)
 
     def test_invalid_key(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         invalid_keys = [os.path.join(*k) for k in (('a', 'b'), ('a', '.'), ('a', '..'), ('a', '..', '..'), ('a', '.b'))]
         invalid_keys += ['.', '..']
         valid_keys = '.a..', 'a.b', 'a..b'
@@ -257,11 +257,11 @@ class TestNestedDictFSErrors(unittest.TestCase):
             self.assertEqual(k[key], key)
 
     def test_invalid_update(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         with self.assertRaises(ValueError):
             k.update('a')
 
     def test_not_sub_path_key(self):
-        k = NestedDictFS(self.path, mode='c')
+        k = DictFS(self.path, mode='c')
         with self.assertRaises(ValueError):
             k.path_key(os.path.join(self.path, '..'))

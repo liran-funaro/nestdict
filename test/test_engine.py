@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ class TestNestedDictFSEngine(unittest.TestCase):
         clean(self.path)
 
     def test_msgpack(self):
-        k = NestedDictFS(self.path, mode='c', store_engine='msgpack')
+        k = DictFS(self.path, mode='c', store_engine='msgpack')
         k['a'] = 1
         self.assertEqual(k['a'], 1)
 
@@ -37,23 +37,23 @@ class TestNestedDictFSEngine(unittest.TestCase):
             k['a'] = np.array([1, 2, 3])
 
     def test_msgpack_numpy(self):
-        k = NestedDictFS(self.path, mode='c', store_engine='msgpack-numpy')
+        k = DictFS(self.path, mode='c', store_engine='msgpack-numpy')
         a = np.array([1, 2, 3])
         k['a'] = a
         self.assertTrue(np.all(k['a'] == a))
 
     def test_pickle(self):
-        k = NestedDictFS(self.path, mode='c', store_engine='pickle')
+        k = DictFS(self.path, mode='c', store_engine='pickle')
         k['a'] = 1
         self.assertEqual(k['a'], 1)
 
     def test_binary(self):
-        k = NestedDictFS(self.path, mode='c', store_engine='binary')
+        k = DictFS(self.path, mode='c', store_engine='binary')
         k['a'] = b"test"
         self.assertEqual(k['a'], b"test")
 
     def test_plain(self):
-        k = NestedDictFS(self.path, mode='c', store_engine='plain')
+        k = DictFS(self.path, mode='c', store_engine='plain')
         k['a'] = "test"
         self.assertEqual(k['a'], "test")
 
@@ -66,6 +66,6 @@ class TestNestedDictFSEngine(unittest.TestCase):
         def my_read(f):
             return pickle.load(f)
 
-        k = NestedDictFS(self.path, mode='c', store_engine=(my_write, my_read))
+        k = DictFS(self.path, mode='c', store_engine=(my_write, my_read))
         k['a'] = 1
         self.assertEqual(k['a'], 1)

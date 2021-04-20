@@ -1,7 +1,7 @@
 """
 Author: Liran Funaro <liran.funaro@gmail.com>
 
-Copyright (C) 2006-2018 Liran Funaro
+Copyright (C) 2006-2021 Liran Funaro
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,8 +23,8 @@ import shutil
 from lru import LRU
 from collections import deque
 
-from nesteddict import store_engines
-from nesteddict.errors import NDAccessViolation, NDKeyError, NDLookupError
+from dictfs import store_engines
+from dictfs.errors import NDAccessViolation, NDKeyError, NDLookupError
 
 from typing import Union, Optional, Any, Pattern
 
@@ -33,11 +33,11 @@ SEARCH_TYPES = slice, Ellipsis.__class__, Pattern
 SEARCH_TYPING = Union[ITEM_TYPING, Union[SEARCH_TYPES]]
 
 
-class NestedDictFS:
+class DictFS:
     __slots__ = ('data_path', 'mode', 'writable', 'store_engine', 'write_method', 'read_method', 'compress_level',
                  'cache')
 
-    def __init__(self, data_path: Union[str, 'NestedDictFS'], mode: str = 'r',
+    def __init__(self, data_path: Union[str, 'DictFS'], mode: str = 'r',
                  cache_size: Optional[int] = None, shared_cache: Optional[LRU] = None,
                  store_engine: store_engines.STORE_TYPING = None, compress_level: int = 9):
         """
@@ -468,48 +468,48 @@ class NestedDictFS:
 
     @property
     def keys(self):
-        return NestedDictIterator(self, include_child=True, include_data=True,
-                                  yield_keys=True, yield_values=False)
+        return DictFSIterator(self, include_child=True, include_data=True,
+                              yield_keys=True, yield_values=False)
 
     @property
     def data_keys(self):
-        return NestedDictIterator(self, include_child=False, include_data=True,
-                                  yield_keys=True, yield_values=False)
+        return DictFSIterator(self, include_child=False, include_data=True,
+                              yield_keys=True, yield_values=False)
 
     @property
     def child_keys(self):
-        return NestedDictIterator(self, include_child=True, include_data=False,
-                                  yield_keys=True, yield_values=False)
+        return DictFSIterator(self, include_child=True, include_data=False,
+                              yield_keys=True, yield_values=False)
 
     @property
     def values(self):
-        return NestedDictIterator(self, include_child=True, include_data=True,
-                                  yield_keys=False, yield_values=True)
+        return DictFSIterator(self, include_child=True, include_data=True,
+                              yield_keys=False, yield_values=True)
 
     @property
     def data_values(self):
-        return NestedDictIterator(self, include_child=False, include_data=True,
-                                  yield_keys=False, yield_values=True)
+        return DictFSIterator(self, include_child=False, include_data=True,
+                              yield_keys=False, yield_values=True)
 
     @property
     def child_values(self):
-        return NestedDictIterator(self, include_child=True, include_data=False,
-                                  yield_keys=False, yield_values=True)
+        return DictFSIterator(self, include_child=True, include_data=False,
+                              yield_keys=False, yield_values=True)
 
     @property
     def items(self):
-        return NestedDictIterator(self, include_child=True, include_data=True,
-                                  yield_keys=True, yield_values=True)
+        return DictFSIterator(self, include_child=True, include_data=True,
+                              yield_keys=True, yield_values=True)
 
     @property
     def child_items(self):
-        return NestedDictIterator(self, include_child=True, include_data=False,
-                                  yield_keys=True, yield_values=True)
+        return DictFSIterator(self, include_child=True, include_data=False,
+                              yield_keys=True, yield_values=True)
 
     @property
     def data_items(self):
-        return NestedDictIterator(self, include_child=False, include_data=True,
-                                  yield_keys=True, yield_values=True)
+        return DictFSIterator(self, include_child=False, include_data=True,
+                              yield_keys=True, yield_values=True)
 
     def get(self, item: ITEM_TYPING, default_value: Any = None,
             include_child: bool = True, include_data: bool = True, create_child: bool = False):
@@ -589,10 +589,10 @@ class NestedDictFS:
         return self.len()
 
 
-class NestedDictIterator:
+class DictFSIterator:
     __slots__ = 'owner', 'include_child', 'include_data', 'yield_keys', 'yield_values'
 
-    def __init__(self, owner: NestedDictFS, include_child: bool = True, include_data: bool = True,
+    def __init__(self, owner: DictFS, include_child: bool = True, include_data: bool = True,
                  yield_keys: bool = True, yield_values: bool = True):
         self.owner = owner
         self.include_child = include_child
